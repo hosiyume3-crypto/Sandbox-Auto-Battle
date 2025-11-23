@@ -146,36 +146,37 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
 }
 
 function getIcon(c) {
-    if(c.category === "EQUIP") return "???";
-    if(c.type === "MOVE") return "??";
-    if(c.id==="assassin" || c.id==="gatotsu") return "???";
-    if(c.id==="boomerang") return "??";
-    if(c.id==="turret") return "??";
-    if(c.id==="orbit_fire") return "??";
-    if(c.id==="air_raid") return "??";
-    if(c.id==="life_drain") return "??";
-    if(c.tag==="HEAL") return "??";
-    if(c.id==="poison") return "??";
-    if(c.id==="blizzard" || c.id==="shadow_bind") return "??";
-    if(c.id==="fireball" || c.id==="slow_sphere") return "??";
-    if(c.id==="giga_laser") return "?";
-    if(c.id==="thunder" || c.id==="stun_gun") return "?";
-    if(c.id==="vortex" || c.id==="gravity" || c.id==="black_hole") return "??";
-    if(c.id==="nova" || c.id==="cleave" || c.id==="repel") return "??";
-    if(c.id === "sniper") return "??";
-    if(c.id === "shotgun") return "??";
-    if(c.id === "m_gun") return "??";
-    if(c.id === "beam") return "??";
-    if(c.id === "fan_laser") return "??";
-    if(c.id === "flamethrower") return "??";
-    if(c.id === "backstep" || c.id === "teleport") return "??";
-    if(c.id === "ragnarok") return "?";
-    if(c.id === "barrage") return "??";
-    if(c.id === "cluster") return "??";
-    if(c.id === "meteor") return "??";
+    if(c.category === "EQUIP") return "🛡️";
+    if(c.type === "MOVE") return "👟";
+    if(c.id==="assassin" || c.id==="gatotsu") return "🗡️";
+    if(c.id==="boomerang") return "🪃";
+    if(c.id==="turret") return "🤖";
+    if(c.id==="orbit_fire") return "🔥";
+    if(c.id==="air_raid") return "✈️";
+    if(c.id==="life_drain") return "🩸";
+    if(c.tag==="HEAL") return "❤️";
+    if(c.id==="poison") return "☠️";
+    if(c.id==="blizzard" || c.id==="shadow_bind") return "❄️";
+    if(c.id==="fireball" || c.id==="slow_sphere") return "☄️";
+    if(c.id==="giga_laser") return "🌠";
+    if(c.id==="thunder" || c.id==="stun_gun") return "⚡";
+    if(c.id==="vortex" || c.id==="gravity" || c.id==="black_hole") return "🌀";
+    if(c.id==="nova" || c.id==="cleave" || c.id==="repel") return "🌊";
+    if(c.id === "sniper") return "🎯";
+    if(c.id === "shotgun") return "🔫";
+    if(c.id === "m_gun") return "🔫";
+    if(c.id === "beam") return "🔦";
+    if(c.id === "fan_laser") return "📶";
+    if(c.id === "flamethrower") return "🔥";
+    if(c.id === "backstep" || c.id === "teleport") return "💨";
+    if(c.id === "ragnarok") return "🌋";
+    if(c.id === "barrage") return "🥊";
+    if(c.id === "cluster" || c.id === "cluster_bomb") return "💣";
+    if(c.id === "meteor") return "☄️";
+    if(c.id === "shooting_star") return "🌟";
 
-    if(c.system==="Magic") return "?";
-    return "??";
+    if(c.system==="Magic") return "✨";
+    return "⚔️";
 }
 
 function drawSelectionScreen(title, subtitle) {
@@ -201,7 +202,9 @@ function drawSelectionScreen(title, subtitle) {
             text(`Power: ${pwr}`, x+cardW/2, y+115);
 
             if(deck.some(d => d.id === c.id)) {
-                fill(255, 200, 50); text("ALREADY OWNED: LEVEL UP!", x+cardW/2, y+130);
+                // --- 変更箇所: テキスト短縮 ---
+                fill(255, 200, 50); text("LEVEL UP!", x+cardW/2, y+130);
+                // ---------------------------
                 fill(255); textAlign(CENTER, TOP); text(c.desc, x+10, y+150, cardW-20, 80);
             } else {
                 fill(255); textAlign(CENTER, TOP); text(c.desc, x+10, y+135, cardW-20, 80);
