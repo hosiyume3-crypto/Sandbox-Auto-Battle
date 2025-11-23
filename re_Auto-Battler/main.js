@@ -1,0 +1,567 @@
+/* Sandbox Auto-Battler V35 - Main Loop & Game Logic */
+
+// --- ASSETS & DATA ---
+function setup() {
+    createCanvas(VIEW_W, VIEW_H + UI_HEIGHT);
+    frameRate(60);
+    initLibraries();
+    camX = WORLD_W/2 - width/2;
+    camY = WORLD_H/2 - height/2;
+}
+
+// --- MAIN LOOP ---
+function draw() {
+    background(10);
+    
+    if (player) {
+        let targetX = player.pos.x - width/2;
+        let targetY = player.pos.y - (height - UI_HEIGHT)/2;
+        camX = lerp(camX, targetX, 0.08);
+        camY = lerp(camY, targetY, 0.08);
+        
+        if(shakePower > 0) {
+            camX += random(-shakePower, shakePower);
+            camY += random(-shakePower, shakePower);
+            shakePower *= 0.9;
+            if(shakePower < 0.5) shakePower = 0;
+        }
+        camX = constrain(camX, 0, WORLD_W - width);
+        camY = constrain(camY, 0, WORLD_H - (height - UI_HEIGHT));
+    }
+
+    push();
+    translate(-camX, -camY);
+    
+    drawGrid();
+    
+    if (gameState !== "TITLE" && gameState !== "SELECT_CLASS") {
+        if (gameState === "PLAY") updateGame();
+        drawGame();
+    }
+    pop();
+
+    if(screenFlash > 0) {
+        noStroke(); fill(255, screenFlash); rect(0, 0, width, height - UI_HEIGHT);
+        screenFlash *= 0.8; if(screenFlash < 5) screenFlash = 0;
+    }
+
+    fill(20); noStroke(); rect(0, height - UI_HEIGHT, width, UI_HEIGHT);
+    stroke(50); line(0, height - UI_HEIGHT, width, height - UI_HEIGHT); noStroke();
+
+    if (gameState === "TITLE") drawTitle();
+    else if (gameState === "SELECT_CLASS") drawClassSelect();
+    else {
+        drawUI();
+        if (gameState === "LEVEL_UP") drawSelectionScreen("LEVEL UP!", "CHOOSE REWARD");
+        else if (gameState === "SKILL_TREE") drawSkillTree();
+        else if (gameState === "EQUIP_SELECT") drawSelectionScreen("RARE DROP!", "CHOOSE EQUIPMENT");
+        else if (gameState === "DISCARD_ACTION") drawDiscardScreen("DECK FULL", deck, "ACTION");
+        else if (gameState === "DISCARD_EQUIP") drawDiscardScreen("INVENTORY FULL", equipment, "EQUIP");
+        else if (gameState === "GAME_OVER") drawGameOver();
+    }
+}
+
+function addShake(amount) { shakePower = min(shakePower + amount, 25); }
+function triggerFlash(amount) { screenFlash = min(screenFlash + amount, 150); }
+
+// --- LOGIC ---
+function updateGame() {
+    const scaleFactor = Math.floor((wave - 1) / 5);
+    let baseSpawnRate = 360; 
+    let rateDecrease = Math.min(180, wave * 10 + scaleFactor * 30); 
+    let spawnRate = baseSpawnRate - rateDecrease; 
+    if(spawnRate < 180) spawnRate = 180; 
+
+    if (frameCount % spawnRate === 0) spawnEnemyGroup();
+
+    player.update();
+    updateEnemies();
+    updateDeployables();
+    updateProjectiles(projectiles, enemies, true);
+    updateProjectiles(enemyProjectiles, [player, ...deployables.filter(d=>d.type==="TURRET")], false);
+    updateDrops();
+    updatePuddles();
+    
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        if (particles[i].dead) particles.splice(i, 1);
+    }
+}
+
+function updateDeployables() {
+    for (let i = deployables.length - 1; i >= 0; i--) {
+        deployables[i].update();
+        if (deployables[i].dead) {
+             if(deployables[i].type === "TURRET") particles.push(new ExplosionEffect(deployables[i].pos.x, deployables[i].pos.y, "#aa0", 5));
+             deployables.splice(i, 1);
+        }
+    }
+}
+
+function updatePuddles() {
+    for (let i = puddles.length - 1; i >= 0; i--) {
+        puddles[i].life--;
+        if (dist(player.pos.x, player.pos.y, puddles[i].x, puddles[i].y) < puddles[i].size/2) {
+            if(frameCount % 30 === 0) player.takeDamage(5);
+        }
+        if (puddles[i].life <= 0) puddles.splice(i, 1);
+    }
+}
+
+function updateEnemies() {
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        e.update();
+        if (e.dead) {
+            // MERCHANT SPECIAL DROP
+            if (e.type === "MERCHANT") {
+                particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
+                createExplosion(e.pos.x, e.pos.y, 0, 50, false, "#a0a");
+                spawnDrop(e.pos.x, e.pos.y, "CHEST");
+                spawnDrop(e.pos.x + 20, e.pos.y, "POTION");
+                spawnDrop(e.pos.x - 20, e.pos.y, "POTION");
+                score += 500;
+            } else {
+                // Regular Drop Logic: Base 25% + Luck Stat
+                let baseDropRate = 0.25; 
+                baseDropRate += player.getStat("dropRateAdd");
+                
+                if(random() < baseDropRate) spawnDrop(e.pos.x, e.pos.y, random() < 0.15 ? "CHEST" : "POTION");
+                
+                let vamp = player.getStat("vampire");
+                if(vamp > 0 && random() < 0.2) {
+                    player.heal(Math.ceil(vamp));
+                    particles.push(new TextParticle(player.pos.x, player.pos.y-20, "HP DRAIN", "#f00"));
+                }
+                createExplosion(e.pos.x, e.pos.y, 0, 30, false, e.col);
+                score += 100;
+            }
+
+            enemies.splice(i, 1);
+            checkLevelUp();
+        }
+    }
+}
+
+function spawnDrop(x, y, type) { drops.push(new Drop(x, y, type)); }
+
+function updateDrops() {
+    let pickupRangeMult = (player.activeMoveCard && player.activeMoveCard.id === "move_mag") ? 3.0 : 1.0;
+    for(let e of equipment) if(e.id === "e_magnet") pickupRangeMult += 1.0;
+
+    for (let i = drops.length - 1; i >= 0; i--) {
+        let d = drops[i];
+        d.update();
+
+        if (d.type === "POTION" && d.age > 300) {
+            drops.splice(i, 1);
+            continue;
+        }
+
+        let distToP = dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y);
+        if (distToP < (player.size + d.size) * pickupRangeMult) {
+            if(distToP > player.size + d.size) {
+                 d.pos.add(p5.Vector.sub(player.pos, d.pos).setMag(6));
+            } else {
+                if (d.type === "POTION") {
+                    let maxPots = 3 + player.getStat("potionStockAdd");
+                    if(player.potionStock < maxPots) {
+                        player.potionStock++;
+                        particles.push(new TextParticle(player.pos.x, player.pos.y, "POTION", "#0f0"));
+                        drops.splice(i, 1);
+                    } else {
+                         if(player.hp < player.maxHp) {
+                             player.heal(20);
+                             drops.splice(i, 1);
+                         }
+                    }
+                } else if (d.type === "CHEST") {
+                    generateRewards("EQUIP");
+                    gameState = "EQUIP_SELECT";
+                    rewardIndex = 0;
+                    triggerFlash(30);
+                    addShake(5);
+                    drops.splice(i, 1);
+                }
+            }
+        }
+    }
+}
+
+function checkLevelUp() {
+    enemiesToNextLevel--;
+    if (enemiesToNextLevel <= 0) {
+        player.level++;
+        if(player.level % 5 === 0) {
+            player.sp++;
+            particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKILL POINT!", "#ff0"));
+        }
+        generateRewards("ACTION"); 
+        gameState = "LEVEL_UP";
+        rewardIndex = 0;
+        enemiesToNextLevel = 5 + Math.floor(wave * 2.5);
+        wave++;
+        triggerFlash(50);
+        addShake(10);
+    }
+}
+
+function spawnEnemyGroup() {
+    // --- DARK MERCHANT SPAWN ---
+    if (random() < 0.02) { // 2% chance per spawn cycle independent of wave
+         let angle = random(TWO_PI);
+         let spawnRadius = width/2 + 200; 
+         let mx = player.pos.x + cos(angle) * spawnRadius;
+         let my = player.pos.y + sin(angle) * spawnRadius;
+         enemies.push(new Enemy(mx, my, "MERCHANT"));
+         particles.push(new TextParticle(mx, my, "Merchant!", "#a0a", 120));
+    }
+
+    let r = random();
+    let type = "BASIC"; 
+    let groupCount = 1;
+
+    if (wave >= 12 && random() < 0.3) groupCount = 2;
+
+    for(let g=0; g<groupCount; g++) {
+        let count = 1;
+        
+        if (wave >= 6 && random() < 0.2) {
+            type = "PHALANX_TRIO"; // Special formation
+            count = 1; 
+        }
+        else if (wave >= 10 && r > 0.7) {
+            let r3 = random();
+            if(r3 < 0.25) type = "PLAGUE";
+            else if (r3 < 0.5) type = "MEDUSA";
+            else if (r3 < 0.75) type = "CURSER";
+            else type = "HOOKER";
+        } 
+        else if (wave >= 8 && r < 0.3) { 
+            let r2 = random();
+            if (r2 < 0.25) type = "BARRIER";
+            else if (r2 < 0.5) type = "TWIN";
+            else if (r2 < 0.75) type = "BERSERKER";
+            else type = "HEAVY"; 
+            count = (type === "TWIN") ? 2 : 1; 
+        } else {
+            if (wave > 3 && r < 0.15) type = "FLANKER";
+            else if (wave > 5 && r > 0.85) type = "HEAVY";
+            else if (wave > 2 && r < 0.3) type = "SHOOTER";
+            else if (wave > 4 && r > 0.75) type = "TANK";
+            else if (wave > 1 && r > 0.3 && r < 0.5) type = "SWARM";
+            
+            if (type === "SWARM") count = 3 + floor(wave/3);
+            else if (type === "FLANKER") count = 2;
+            else count = 1;
+        }
+
+        let spawnRadius = width/2 + 100; 
+        let angleCenter = random(TWO_PI);
+        
+        if (type === "PHALANX_TRIO") {
+            let bx = player.pos.x + cos(angleCenter) * spawnRadius;
+            let by = player.pos.y + sin(angleCenter) * spawnRadius;
+            let toPlayer = p5.Vector.sub(player.pos, createVector(bx,by)).normalize();
+            let perp = createVector(-toPlayer.y, toPlayer.x);
+            
+            let e1 = new Enemy(bx, by, "P_TANK");
+            e1.pos.x = constrain(e1.pos.x, 50, WORLD_W-50); e1.pos.y = constrain(e1.pos.y, 50, WORLD_H-50);
+            enemies.push(e1);
+            
+            let e2 = new Enemy(bx + perp.x*40 - toPlayer.x*30, by + perp.y*40 - toPlayer.y*30, "P_FIGHTER");
+            e2.pos.x = constrain(e2.pos.x, 50, WORLD_W-50); e2.pos.y = constrain(e2.pos.y, 50, WORLD_H-50);
+            enemies.push(e2);
+
+            let e3 = new Enemy(bx - perp.x*40 - toPlayer.x*60, by - perp.y*40 - toPlayer.y*60, "P_MAGE");
+            e3.pos.x = constrain(e3.pos.x, 50, WORLD_W-50); e3.pos.y = constrain(e3.pos.y, 50, WORLD_H-50);
+            enemies.push(e3);
+            
+            particles.push(new Shockwave(bx, by, 50, "#aaa"));
+        }
+        else {
+            for(let i=0; i<count; i++) {
+                let angle = angleCenter + random(-0.5, 0.5);
+                let sx = constrain(player.pos.x + cos(angle) * spawnRadius, 50, WORLD_W - 50);
+                let sy = constrain(player.pos.y + sin(angle) * spawnRadius, 50, WORLD_H - 50);
+
+                enemies.push(new Enemy(sx, sy, type));
+                particles.push(new Shockwave(sx, sy, 30, "#fff"));
+
+                if (type === "BARRIER") {
+                    enemies.push(new Enemy(sx+30, sy, "GUARD"));
+                    enemies.push(new Enemy(sx-30, sy, "GUARD"));
+                }
+            }
+        }
+        r = random();
+    }
+}
+
+function updateProjectiles(list, targets, isPlayerOwner) {
+    for (let i = list.length - 1; i >= 0; i--) {
+        let p = list[i];
+        p.update();
+        
+        if(frameCount % 2 === 0) {
+             if(p.card.id === "flame" || p.card.id === "flamethrower") particles.push(new AfterImage(p.pos.x + random(-3,3), p.pos.y + random(-3,3), random(5,10), p.color, 10));
+             else if(!p.isOrbiter) particles.push(new Spark(p.pos.x, p.pos.y, p.color, p.vel.heading() + PI, random(1,3), 5));
+        }
+
+        if(!p.dead) {
+            if(!isPlayerOwner && player.state === "MOVING" && player.activeMoveCard && player.activeMoveCard.id === "move_reflect") {
+                if(dist(p.pos.x, p.pos.y, player.pos.x, player.pos.y) < 40) {
+                    particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCK", "#aaf"));
+                    particles.push(new Shockwave(p.pos.x, p.pos.y, 20, "#aaf"));
+                    createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#aaf", 5);
+                    p.dead = true;
+                    continue;
+                }
+            }
+            
+            for (let t of targets) {
+                if (t.dead) continue;
+                // MERCHANT doesn't block projectiles but can take damage (though hard to hit)
+                let hitSize = (t instanceof Deployable) ? 20 : t.size/2 + 8;
+                if(p.card.id === "giga_laser") hitSize += 25; 
+                if(p.card.id === "slow_sphere") hitSize += 30; 
+
+                if (dist(p.pos.x, p.pos.y, t.pos.x, t.pos.y) < hitSize) {
+                    if (p.card.tag === "EXPLOSION") {
+                        createExplosion(p.pos.x, p.pos.y, p.val, p.card.range, isPlayerOwner);
+                        p.dead = true;
+                        break;
+                    }
+
+                    if (p.card.id === "cluster") {
+                         createExplosion(p.pos.x, p.pos.y, p.val, 60, isPlayerOwner, "#fa0"); 
+                         for(let m=0; m<3; m++) {
+                             let mbDir = p5.Vector.random2D();
+                             let mb = new Projectile(p.pos.x, p.pos.y, mbDir, {id:"minibomb", tag:"EXPLOSION", range:60, color:"#fa0"}, p.val * 0.8, random(3,6));
+                             mb.drag = 0.85; 
+                             mb.life = 40 + random(20);
+                             list.push(mb);
+                         }
+                         p.dead = true;
+                         break;
+                    }
+                    
+                    if (isPlayerOwner) {
+                         t.takeDamage(p.val, p.card);
+                    }
+                    else {
+                         let dmg = p.val;
+                         for(let e of equipment) if(e.id === "e_kevlar") dmg *= 0.7;
+                         
+                         t.takeDamage(dmg);
+                         if(p.card.tag === "PETRIFY") t.applyStatus("STUN", 60);
+                         if(p.card.tag === "SLOW") t.applyStatus("SLOW", 120);
+                         if(p.card.tag === "POISON") t.applyStatus("POISON", 300);
+                         if(p.card.tag === "HOOK") {
+                             let pullDir = p.vel.copy().normalize().mult(-1);
+                             t.pos.add(pullDir.mult(150)); 
+                             particles.push(new TextParticle(t.pos.x, t.pos.y, "HOOKED!", "#f00"));
+                             addShake(10);
+                         }
+                    }
+                    
+                    createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, p.color, 8);
+                    particles.push(new Shockwave(p.pos.x, p.pos.y, 30, p.color));
+                    
+                    if(!p.piercing && !p.isOrbiter) p.dead = true;
+                    break;
+                }
+            }
+        }
+        if (p.dead && p.drag) { 
+             if (p.card.id === "minibomb") createExplosion(p.pos.x, p.pos.y, p.val, p.card.range, true, "#fa0");
+        }
+        if (p.dead) list.splice(i, 1);
+    }
+}
+
+function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
+    let col = colOverride || "#f50";
+    addShake(8);
+    if(range > 100) triggerFlash(20);
+    particles.push(new Shockwave(x, y, range, col));
+    particles.push(new ExplosionEffect(x, y, col, 20));
+    particles.push(new AfterImage(x, y, range * 0.8, "#fff", 5)); 
+
+    if(dmg > 0) {
+        let targets = isPlayerOwner ? enemies : [player, ...deployables.filter(d=>d.type==="TURRET")];
+        for(let t of targets) {
+            if(dist(x, y, t.pos.x, t.pos.y) < range) {
+                t.takeDamage(dmg, {tag:"EXPLOSION"});
+                let push = p5.Vector.sub(t.pos, createVector(x,y)).setMag(20);
+                t.pos.add(push);
+            }
+        }
+    }
+}
+
+function createImpactSparks(x, y, angle, col, count) {
+    for(let i=0; i<count; i++) {
+        let spd = random(3, 8);
+        let spread = random(-0.8, 0.8);
+        particles.push(new Spark(x, y, col, angle + spread, spd, random(10, 20)));
+    }
+}
+
+// --- INPUT & GAME FLOW ---
+function keyPressed() {
+    if (gameState === "TITLE") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "SELECT_CLASS"; } 
+    else if (gameState === "SELECT_CLASS") {
+        if (keyCode === LEFT_ARROW) classIndex = (classIndex - 1 + 4) % 4;
+        if (keyCode === RIGHT_ARROW) classIndex = (classIndex + 1) % 4;
+        if (key === 'Enter' || key === 'z' || key === 'Z') { playerClass = CLASSES[classIndex]; startGame(); }
+    }
+    else if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
+        if (keyCode === LEFT_ARROW) rewardIndex = (rewardIndex - 1 + CARD_CHOICES) % CARD_CHOICES;
+        if (keyCode === RIGHT_ARROW) rewardIndex = (rewardIndex + 1) % CARD_CHOICES;
+        if (key === 'Enter' || key === 'z' || key === 'Z') confirmSelection();
+        if (key === 'x' || key === 'X') {
+            gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
+            particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKIPPED", "#999"));
+        }
+    } 
+    else if (gameState === "SKILL_TREE") {
+        if (keyCode === LEFT_ARROW) skillIndex = (skillIndex - 1 + 6) % 6; // Updated for 6 items
+        if (keyCode === RIGHT_ARROW) skillIndex = (skillIndex + 1) % 6;
+        if (keyCode === UP_ARROW) skillIndex = (skillIndex - 3 + 6) % 6;
+        if (keyCode === DOWN_ARROW) skillIndex = (skillIndex + 3) % 6;
+
+        if (key === 'z' || key === 'Z') { 
+             if(player.sp > 0) {
+                 player.sp--;
+                 if(skillIndex === 0) player.upgrades.hp++;
+                 if(skillIndex === 1) player.upgrades.atk++;
+                 if(skillIndex === 2) player.upgrades.spd++;
+                 if(skillIndex === 3) player.upgrades.range++;
+                 if(skillIndex === 4) player.upgrades.luck++;
+                 if(skillIndex === 5) player.upgrades.def++;
+
+                 player.maxHp = 200 + player.upgrades.hp * 50 + player.getStat("hpAdd");
+                 player.hp = min(player.hp + 50, player.maxHp);
+                 particles.push(new TextParticle(width/2, height/2, "UPGRADE!", "#ff0"));
+                 createImpactSparks(width/2, height/2, -HALF_PI, "#ff0", 20);
+             }
+             gameState = "PLAY";
+        }
+    }
+    else if (gameState.includes("DISCARD")) {
+        let targetList = (gameState === "DISCARD_ACTION") ? deck : equipment;
+        if (keyCode === LEFT_ARROW) discardIndex = (discardIndex - 1 + targetList.length) % targetList.length;
+        if (keyCode === RIGHT_ARROW) discardIndex = (discardIndex + 1) % targetList.length;
+        if (key === 'Enter' || key === 'z' || key === 'Z') confirmDiscard();
+    }
+    else if (gameState === "GAME_OVER") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "TITLE"; }
+}
+
+function startGame() {
+    if(playerClass === "WARRIOR") deck = [getCardById("slash"), getCardById("hammer"), getCardById("charge")];
+    else if(playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("turret")];
+    else if(playerClass === "MAGE") deck = [getCardById("flame"), getCardById("cleave"), getCardById("beam")];
+    else deck = [getCardById("slash"), getCardById("bow"), getCardById("heal")];
+
+    equipment = []; 
+    player = new Player();
+    enemies = []; drops = []; projectiles = []; enemyProjectiles = []; particles = []; deployables = []; puddles = [];
+    score = 0; wave = 1; enemiesToNextLevel = 5;
+    actionRewardCount = 0; 
+    player.pos = createVector(WORLD_W/2, WORLD_H/2);
+    camX = WORLD_W/2 - width/2;
+    camY = WORLD_H/2 - height/2;
+    player.refreshMoveCard();
+    gameState = "PLAY";
+}
+
+function generateRewards(type) {
+    rewardOptions = [];
+    let pool;
+    if (type === "ACTION") {
+        pool = actionLibrary.filter(c => c.type === "ACTION");
+    } else {
+        pool = [...equipLibrary, ...actionLibrary.filter(c => c.type === "MOVE")];
+        pool = pool.filter(c => !equipment.some(e => e.id === c.id));
+    }
+    
+    if(pool.length === 0) pool = (type==="ACTION") ? actionLibrary : equipLibrary;
+
+    let availablePool = pool; 
+    if (type === "ACTION") actionRewardCount++;
+
+    for(let i=0; i<CARD_CHOICES; i++) {
+        let rarityRoll = random();
+        let targetRarity = "COMMON";
+        if (rarityRoll < 0.10) targetRarity = "LEGENDARY";
+        else if (rarityRoll < 0.40) targetRarity = "RARE";
+        
+        let rarityPool = availablePool.filter(c => c.rarity === targetRarity);
+        if (rarityPool.length === 0) rarityPool = availablePool;
+
+        let weightedPool = [];
+        for(let c of rarityPool) {
+            let weight = 1;
+            if(playerClass === "WARRIOR" && c.system === "Melee") weight = 3;
+            if(playerClass === "RANGER" && c.system === "Ranged") weight = 3;
+            if(playerClass === "MAGE" && c.system === "Magic") weight = 3;
+            if (deck.some(d => d.id === c.id)) weight += 2;
+            for(let k=0; k<weight; k++) weightedPool.push(c);
+        }
+        
+        if(weightedPool.length === 0) weightedPool = availablePool;
+
+        let r = floor(random(weightedPool.length));
+        let c = {...weightedPool[r]}; 
+        if(c.cooldownMax) c.currentCooldown = 0;
+        
+        if (rewardOptions.some(opt => opt.id === c.id)) {
+             if(availablePool.length > CARD_CHOICES) { i--; continue; }
+        }
+        rewardOptions.push(c);
+    }
+}
+
+function confirmSelection() {
+    let selection = rewardOptions[rewardIndex];
+    let nextState = (player.sp > 0) ? "SKILL_TREE" : "PLAY"; 
+    
+    if (selection.category === "ACTION") {
+        let existingCard = deck.find(c => c.id === selection.id);
+        if (existingCard) {
+            if ((existingCard.level || 1) < 5) {
+                existingCard.level = (existingCard.level || 1) + 1;
+                particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "LEVEL UP!", "#fff"));
+                createImpactSparks(player.pos.x, player.pos.y, -HALF_PI, selection.color, 15);
+                gameState = nextState;
+                return;
+            }
+        }
+    }
+
+    if (selection.type === "MOVE") {
+        let idx = deck.findIndex(c => c.type === "MOVE");
+        if (idx !== -1) deck.splice(idx, 1);
+        deck.push(selection);
+        player.refreshMoveCard();
+        gameState = nextState;
+        return;
+    }
+    let targetList = (selection.category === "EQUIP") ? equipment : deck;
+    let maxSize = (selection.category === "EQUIP") ? MAX_EQUIP_SIZE : MAX_DECK_SIZE;
+    if (targetList.length >= maxSize) {
+        pendingCard = selection; discardIndex = 0;
+        gameState = (selection.category === "EQUIP") ? "DISCARD_EQUIP" : "DISCARD_ACTION";
+    } else { 
+        targetList.push(selection); 
+        gameState = nextState; 
+    }
+}
+
+function confirmDiscard() {
+    if (gameState === "DISCARD_ACTION") { deck.splice(discardIndex, 1); deck.push(pendingCard); player.refreshMoveCard(); }
+    else if (gameState === "DISCARD_EQUIP") { equipment.splice(discardIndex, 1); equipment.push(pendingCard); }
+    pendingCard = null; 
+    gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
+}
