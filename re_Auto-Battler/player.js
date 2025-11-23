@@ -32,7 +32,7 @@ class Player {
         
         this.lastTargetAcquireTime = 0; 
         
-        this.retreatTimer = 0; // For panic retreat
+        this.retreatTimer = 0; 
 
         this.status = { stun:0, slow:0, poison:0, poisonDmg:0 };
     }
@@ -49,14 +49,10 @@ class Player {
         }
         // SKILL TREE UPGRADES
         if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.15); 
-        // --- 変更: スキルツリー Speed +10% ---
         if(type === "speed") val *= (1 + this.upgrades.spd * 0.10);
-        // ------------------------------------
         
         if(type === "rangeAdd") val += this.upgrades.range * 0.10; 
-        // --- 変更: スキルツリー Luck +2.5% ---
         if(type === "dropRateAdd") val += this.upgrades.luck * 0.025; 
-        // -------------------------------------
 
         for(let e of equipment) {
             if(e.id === "e_rage") {
@@ -80,9 +76,7 @@ class Player {
     }
 
     update() {
-        // --- 変更: スキルツリー HP +25 ---
         this.maxHp = 200 + this.upgrades.hp * 25 + this.getStat("hpAdd");
-        // ------------------------------
         
         let hasBarrier = equipment.some(e => e.id === "e_barrier");
         if(hasBarrier) {
@@ -197,18 +191,16 @@ class Player {
                 }
             }
             
-            // --- 変更: 緊急回避 (反対方向へ高速移動) ---
             if ((playerClass === "MAGE" || playerClass === "RANGER") && this.retreatTimer <= 0) {
                 let nearEnemy = this.getClosestEnemy();
                 if (nearEnemy && dist(this.pos.x, this.pos.y, nearEnemy.pos.x, nearEnemy.pos.y) < 60) {
                     let runDir = p5.Vector.sub(this.pos, nearEnemy.pos).normalize();
-                    this.pos.add(runDir.mult(150)); // 高速移動
+                    this.pos.add(runDir.mult(150)); 
                     particles.push(new TextParticle(this.pos.x, this.pos.y - 20, "ESCAPE!", "#fff"));
                     particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#fff", 10));
-                    this.retreatTimer = 300; // CT 5秒
+                    this.retreatTimer = 300; 
                 }
             }
-            // ---------------------------------------
             
             if (this.activeMoveCard && this.activeMoveCard.id === "move_barrage" && frameCount % 10 === 0) {
                 let target = this.getClosestEnemy();
@@ -402,8 +394,11 @@ class Player {
         
         let levelMult = 1.0 + ((c.level || 1) - 1) * 0.15; 
         let baseVal = c.val * typeMult * levelMult;
-        let variance = random(0, this.level * 1.5); 
-        let finalVal = Math.floor(baseVal + variance);
+        
+        // --- 変更: ダメージのばらつき (±20%のランダム) ---
+        let variance = random(0.8, 1.2); 
+        let finalVal = Math.floor(baseVal * variance);
+        // ---------------------------------------------
         
         if(!isMultiHit) {
             particles.push(new TextParticle(this.pos.x, this.pos.y - 30, c.name, c.color, 60));
@@ -631,8 +626,8 @@ class Player {
                      p.drag = 0.95; 
                      projectiles.push(p);
                 } else if (c.id === "railgun") {
-                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 0); // Speed 0 for stationary beam
-                     p.life = 120; // Lasts 2s
+                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 0); 
+                     p.life = 120; 
                      projectiles.push(p);
                      addShake(5);
                 } else if (c.id === "icicle") {
@@ -640,10 +635,8 @@ class Player {
                      let p2 = new Projectile(this.pos.x, this.pos.y, dir.copy().rotate(0.1), c, finalVal, 15);
                      projectiles.push(p1); projectiles.push(p2);
                 } else if (c.id === "shooting_star") {
-                     // --- 変更: スターはゆっくり ---
                      let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 5); 
                      projectiles.push(p);
-                     // ---------------------------
                 } else {
                     let pSpeed = (c.id === "flame") ? 8 : 15;
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, pSpeed);
@@ -657,12 +650,10 @@ class Player {
     nextCardIndex() { this.deckIndex = (this.deckIndex + 1) % deck.length; this.state = "IDLE"; }
 
     takeDamage(amt) {
-        // --- 変更: アイテム収集中に被弾したら戦闘モードへ ---
         if (this.state === "LOOTING") {
             this.state = "IDLE";
             this.target = null;
         }
-        // ----------------------------------------------
 
         if(this.invincibleTimer > 0) return;
         if(this.activeMoveCard && this.activeMoveCard.id === "move_ghost" && this.state === "MOVING" && random() < 0.3) {
@@ -683,7 +674,7 @@ class Player {
         if(this.activeMoveCard && this.activeMoveCard.id === "move_guard" && this.state === "MOVING") reduction += 0.5; 
         if(this.defBuffTimer > 0) reduction += 0.5;
         
-        reduction += this.upgrades.def * 0.05; // Skill Tree DEF +5%
+        reduction += this.upgrades.def * 0.05; 
 
         let finalDmg = Math.max(1, Math.floor(amt * (1.0 - Math.min(0.9, reduction))));
         this.hp -= finalDmg;
@@ -722,11 +713,11 @@ class Player {
 
         for (let d of drops) {
             if (d.type === "POTION") {
-                // HP満タンかつストック満タンなら無視
                 if (this.potionStock >= maxPots && this.hp >= this.maxHp) continue; 
             }
-            // ハートはHP満タンなら無視
+            // --- 変更: HP満タン時はハートを無視 ---
             if (d.type === "HEART" && this.hp >= this.maxHp) continue;
+            // ----------------------------------
             
             let distToDrop = dist(this.pos.x, this.pos.y, d.pos.x, d.pos.y);
             if (distToDrop < minDist) { minDist = distToDrop; closest = d; }
