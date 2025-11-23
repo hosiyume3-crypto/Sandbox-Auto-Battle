@@ -3,7 +3,6 @@
 class Player {
     constructor() {
         this.pos = createVector(WORLD_W/2, WORLD_H/2);
-        this.vel = createVector(0, 0); // Drift用
         this.size = 24;
         this.level = 1;
         this.sp = 0;
@@ -24,12 +23,16 @@ class Player {
         this.invincibleTimer = 0;
         this.baseSpeed = 3.5;
         this.warpTimer = 0;
-        this.phaseTimer = 0; // Phase Step用
+        this.phaseTimer = 0; 
         this.defBuffTimer = 0; 
         this.chargeTimer = 0; 
         
         this.barrierStock = 0;
         this.barrierRefillTimer = 0;
+        
+        this.lastTargetAcquireTime = 0; 
+        
+        this.retreatTimer = 0; // For panic retreat
 
         this.status = { stun:0, slow:0, poison:0, poisonDmg:0 };
     }
@@ -46,10 +49,14 @@ class Player {
         }
         // SKILL TREE UPGRADES
         if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.15); 
-        if(type === "speed") val *= (1 + this.upgrades.spd * 0.025);
+        // --- 変更: スキルツリー Speed +10% ---
+        if(type === "speed") val *= (1 + this.upgrades.spd * 0.10);
+        // ------------------------------------
         
         if(type === "rangeAdd") val += this.upgrades.range * 0.10; 
-        if(type === "dropRateAdd") val += this.upgrades.luck * 0.05; 
+        // --- 変更: スキルツリー Luck +2.5% ---
+        if(type === "dropRateAdd") val += this.upgrades.luck * 0.025; 
+        // -------------------------------------
 
         for(let e of equipment) {
             if(e.id === "e_rage") {
@@ -73,7 +80,9 @@ class Player {
     }
 
     update() {
-        this.maxHp = 200 + this.upgrades.hp * 50 + this.getStat("hpAdd");
+        // --- 変更: スキルツリー HP +25 ---
+        this.maxHp = 200 + this.upgrades.hp * 25 + this.getStat("hpAdd");
+        // ------------------------------
         
         let hasBarrier = equipment.some(e => e.id === "e_barrier");
         if(hasBarrier) {
@@ -105,19 +114,18 @@ class Player {
         }
 
         if (this.potionUseTimer > 0) this.potionUseTimer--;
+        if (this.retreatTimer > 0) this.retreatTimer--;
         
-        // --- 変更: オートポーション (HP50%以下で発動, CT5秒) ---
         if (this.potionStock > 0 && this.potionUseTimer <= 0) {
             if (this.hp <= this.maxHp * 0.5) {
                 this.potionStock--;
-                let healAmount = Math.floor(this.maxHp * 0.30); // 30%回復
+                let healAmount = Math.floor(this.maxHp * 0.30); 
                 this.heal(healAmount);
-                this.potionUseTimer = 300; // CT 5秒 (300f)
+                this.potionUseTimer = 300; 
                 particles.push(new TextParticle(this.pos.x, this.pos.y - 20, "AUTO POTION", "#0f0"));
                 particles.push(new Shockwave(this.pos.x, this.pos.y, 40, "#0f0"));
             }
         }
-        // ---------------------------------------------
 
         if (this.hp <= 0) { gameState = "GAME_OVER"; return; }
         for(let c of deck) { if(c.currentCooldown > 0) c.currentCooldown--; }
@@ -127,14 +135,6 @@ class Player {
         if (this.defBuffTimer > 0) this.defBuffTimer--;
         if (this.chargeTimer > 0) this.chargeTimer--;
         
-        // Friction for Drift
-        if(this.activeMoveCard && this.activeMoveCard.id === "move_drift") {
-             this.pos.add(this.vel);
-             this.vel.mult(0.92); // 滑る慣性
-        } else {
-             this.vel.mult(0);
-        }
-
         if (this.invincibleTimer <= 0) {
             for (let e of enemies) {
                 if (dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < (this.size + e.size)/2) {
@@ -153,7 +153,11 @@ class Player {
                             if(e.eliteTrait === "POWER") collisionDmg *= 1.5;
                             if(e.eliteTrait === "VENOM") { this.applyStatus("POISON", 180); } 
                             this.takeDamage(collisionDmg);
-                            this.pos.add(p5.Vector.sub(this.pos, e.pos).setMag(10));
+                            
+                            if (e.type !== "P_TANK") {
+                                this.pos.add(p5.Vector.sub(this.pos, e.pos).setMag(10));
+                            }
+                            
                             for(let eq of equipment) { if(eq.id === "e_thorns") e.takeDamage(10); }
                         }
                     }
@@ -182,6 +186,30 @@ class Player {
                 particles.push(new TextParticle(this.pos.x, this.pos.y - 30, "?", "#fff"));
             }
             
+            if (this.target && frameCount - this.lastTargetAcquireTime > 180) {
+                let newTarget = this.getClosestEnemy();
+                if (newTarget && newTarget !== this.target) {
+                    this.target = newTarget;
+                    this.lastTargetAcquireTime = frameCount;
+                    particles.push(new TextParticle(this.pos.x, this.pos.y-30, "RETARGET", "#fff"));
+                } else {
+                    this.lastTargetAcquireTime = frameCount; 
+                }
+            }
+            
+            // --- 変更: 緊急回避 (反対方向へ高速移動) ---
+            if ((playerClass === "MAGE" || playerClass === "RANGER") && this.retreatTimer <= 0) {
+                let nearEnemy = this.getClosestEnemy();
+                if (nearEnemy && dist(this.pos.x, this.pos.y, nearEnemy.pos.x, nearEnemy.pos.y) < 60) {
+                    let runDir = p5.Vector.sub(this.pos, nearEnemy.pos).normalize();
+                    this.pos.add(runDir.mult(150)); // 高速移動
+                    particles.push(new TextParticle(this.pos.x, this.pos.y - 20, "ESCAPE!", "#fff"));
+                    particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#fff", 10));
+                    this.retreatTimer = 300; // CT 5秒
+                }
+            }
+            // ---------------------------------------
+            
             if (this.activeMoveCard && this.activeMoveCard.id === "move_barrage" && frameCount % 10 === 0) {
                 let target = this.getClosestEnemy();
                 if (target && dist(this.pos.x, this.pos.y, target.pos.x, target.pos.y) < 400) {
@@ -208,6 +236,8 @@ class Player {
         }
         else if (this.state === "ACTING") {
             this.chaseTimer = 0;
+            this.lastTargetAcquireTime = frameCount; 
+            
             this.timer--;
             if(this.currentCard) {
                 if ((this.currentCard.id === "multicut" || this.currentCard.id === "m_gun") && this.timer % 5 === 0 && this.timer > 0) this.performAction(true);
@@ -236,8 +266,10 @@ class Player {
              }
              if (deck.some(c => c.category === "ACTION" && c.currentCooldown <= 0)) this.state = "IDLE";
         }
-        this.pos.x = constrain(this.pos.x, 10, WORLD_W-10);
-        this.pos.y = constrain(this.pos.y, 10, WORLD_H-10);
+        
+        let margin = this.size / 2 + 2;
+        this.pos.x = constrain(this.pos.x, margin, WORLD_W - margin);
+        this.pos.y = constrain(this.pos.y, margin, WORLD_H - margin);
     }
 
     findNextCard() {
@@ -264,8 +296,13 @@ class Player {
         if (card.id === "assassin") targetEnemy = this.getFarthestEnemy();
         else targetEnemy = this.getClosestEnemy();
 
-        if (!targetEnemy) { this.timer = 15; this.state = "ACTING"; return; }
+        if (!targetEnemy) { 
+            this.state = "IDLE";
+            return; 
+        }
+
         this.target = targetEnemy;
+        this.lastTargetAcquireTime = frameCount;
         
         if (card.id === "charge") {
             this.state = "CASTING";
@@ -328,13 +365,7 @@ class Player {
             }
         }
         
-        // --- 新移動カードの処理 ---
-        if(this.activeMoveCard && this.activeMoveCard.id === "move_drift") {
-            let acc = dir.copy().setMag(speed * 0.05);
-            this.vel.add(acc);
-            this.vel.limit(speed * 1.5);
-        } 
-        else if(this.activeMoveCard && this.activeMoveCard.id === "move_phase") {
+        if(this.activeMoveCard && this.activeMoveCard.id === "move_phase") {
             this.pos.add(dir.mult(speed));
             if(this.state === "MOVING") {
                 if(this.phaseTimer <= 0) {
@@ -347,7 +378,6 @@ class Player {
         else {
             this.pos.add(dir.mult(speed));
         }
-        // -----------------------
         
         if (this.state !== "LOOTING" && this.currentCard) {
              let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere" || this.currentCard.id === "life_drain") ? 9999 : this.currentCard.range;
@@ -564,6 +594,12 @@ class Player {
                     this.heal(drainAmt);
                     particles.push(new TextParticle(this.target.pos.x, this.target.pos.y, "DRAIN", "#a0f"));
                     particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 40, "#a0f"));
+                    for(let i=0; i<5; i++) {
+                        let p = new Spark(this.target.pos.x, this.target.pos.y, "#f0a", 0, 0, 30);
+                        p.vel = p5.Vector.sub(this.pos, this.target.pos).normalize().mult(random(5,8));
+                        p.drag = 1.0;
+                        particles.push(p);
+                    }
                     return; 
                 }
                 
@@ -594,10 +630,20 @@ class Player {
                      let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 15);
                      p.drag = 0.95; 
                      projectiles.push(p);
-                } else if (c.id === "cluster_bomb") {
-                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 15);
-                     p.drag = 0.90; 
+                } else if (c.id === "railgun") {
+                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 0); // Speed 0 for stationary beam
+                     p.life = 120; // Lasts 2s
                      projectiles.push(p);
+                     addShake(5);
+                } else if (c.id === "icicle") {
+                     let p1 = new Projectile(this.pos.x, this.pos.y, dir.copy().rotate(-0.1), c, finalVal, 15);
+                     let p2 = new Projectile(this.pos.x, this.pos.y, dir.copy().rotate(0.1), c, finalVal, 15);
+                     projectiles.push(p1); projectiles.push(p2);
+                } else if (c.id === "shooting_star") {
+                     // --- 変更: スターはゆっくり ---
+                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 5); 
+                     projectiles.push(p);
+                     // ---------------------------
                 } else {
                     let pSpeed = (c.id === "flame") ? 8 : 15;
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, pSpeed);
@@ -611,6 +657,13 @@ class Player {
     nextCardIndex() { this.deckIndex = (this.deckIndex + 1) % deck.length; this.state = "IDLE"; }
 
     takeDamage(amt) {
+        // --- 変更: アイテム収集中に被弾したら戦闘モードへ ---
+        if (this.state === "LOOTING") {
+            this.state = "IDLE";
+            this.target = null;
+        }
+        // ----------------------------------------------
+
         if(this.invincibleTimer > 0) return;
         if(this.activeMoveCard && this.activeMoveCard.id === "move_ghost" && this.state === "MOVING" && random() < 0.3) {
             particles.push(new TextParticle(this.pos.x, this.pos.y-10, "DODGE", "#fff")); return;
@@ -630,7 +683,7 @@ class Player {
         if(this.activeMoveCard && this.activeMoveCard.id === "move_guard" && this.state === "MOVING") reduction += 0.5; 
         if(this.defBuffTimer > 0) reduction += 0.5;
         
-        reduction += this.upgrades.def * 0.03; // Skill Tree DEF
+        reduction += this.upgrades.def * 0.05; // Skill Tree DEF +5%
 
         let finalDmg = Math.max(1, Math.floor(amt * (1.0 - Math.min(0.9, reduction))));
         this.hp -= finalDmg;
@@ -668,7 +721,13 @@ class Player {
         let maxPots = 3 + this.getStat("potionStockAdd");
 
         for (let d of drops) {
-            if (d.type === "POTION" && this.potionStock >= maxPots) continue;
+            if (d.type === "POTION") {
+                // HP満タンかつストック満タンなら無視
+                if (this.potionStock >= maxPots && this.hp >= this.maxHp) continue; 
+            }
+            // ハートはHP満タンなら無視
+            if (d.type === "HEART" && this.hp >= this.maxHp) continue;
+            
             let distToDrop = dist(this.pos.x, this.pos.y, d.pos.x, d.pos.y);
             if (distToDrop < minDist) { minDist = distToDrop; closest = d; }
         }
@@ -690,10 +749,6 @@ class Player {
             else if (this.activeMoveCard.id === "move_phase") { 
                 drawingContext.setLineDash([15, 5]); circle(0,0, 35); drawingContext.setLineDash([]);
                 if(this.phaseTimer > 0) { noStroke(); fill(160,0,255,100); circle(0,0,35 * (this.phaseTimer/60)); }
-            }
-            else if (this.activeMoveCard.id === "move_drift") { 
-                strokeWeight(2); circle(0,0,35); 
-                line(-15, 5, -25, 15); line(15, 5, 25, 15); // Tires mark style
             }
             else { circle(0,0,35); }
         }
