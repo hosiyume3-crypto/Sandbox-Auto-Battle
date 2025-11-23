@@ -113,7 +113,6 @@ function updateEnemies() {
         let e = enemies[i];
         e.update();
         if (e.dead) {
-            // MERCHANT SPECIAL DROP
             if (e.type === "MERCHANT") {
                 particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
                 createExplosion(e.pos.x, e.pos.y, 0, 50, false, "#a0a");
@@ -122,7 +121,6 @@ function updateEnemies() {
                 spawnDrop(e.pos.x - 20, e.pos.y, "POTION");
                 score += 500;
             } else {
-                // Regular Drop Logic: Base 25% + Luck Stat
                 let baseDropRate = 0.25; 
                 baseDropRate += player.getStat("dropRateAdd");
                 
@@ -171,7 +169,7 @@ function updateDrops() {
                         drops.splice(i, 1);
                     } else {
                          if(player.hp < player.maxHp) {
-                             player.heal(20);
+                             player.heal(Math.ceil(player.maxHp * 0.03)); 
                              drops.splice(i, 1);
                          }
                     }
@@ -207,8 +205,7 @@ function checkLevelUp() {
 }
 
 function spawnEnemyGroup() {
-    // --- DARK MERCHANT SPAWN ---
-    if (random() < 0.02) { // 2% chance per spawn cycle independent of wave
+    if (random() < 0.02) { 
          let angle = random(TWO_PI);
          let spawnRadius = width/2 + 200; 
          let mx = player.pos.x + cos(angle) * spawnRadius;
@@ -225,35 +222,18 @@ function spawnEnemyGroup() {
 
     for(let g=0; g<groupCount; g++) {
         let count = 1;
-        
-        if (wave >= 6 && random() < 0.2) {
-            type = "PHALANX_TRIO"; // Special formation
-            count = 1; 
-        }
+        if (wave >= 6 && random() < 0.2) { type = "PHALANX_TRIO"; count = 1; }
         else if (wave >= 10 && r > 0.7) {
             let r3 = random();
-            if(r3 < 0.25) type = "PLAGUE";
-            else if (r3 < 0.5) type = "MEDUSA";
-            else if (r3 < 0.75) type = "CURSER";
-            else type = "HOOKER";
+            if(r3 < 0.25) type = "PLAGUE"; else if (r3 < 0.5) type = "MEDUSA"; else if (r3 < 0.75) type = "CURSER"; else type = "HOOKER";
         } 
         else if (wave >= 8 && r < 0.3) { 
             let r2 = random();
-            if (r2 < 0.25) type = "BARRIER";
-            else if (r2 < 0.5) type = "TWIN";
-            else if (r2 < 0.75) type = "BERSERKER";
-            else type = "HEAVY"; 
+            if (r2 < 0.25) type = "BARRIER"; else if (r2 < 0.5) type = "TWIN"; else if (r2 < 0.75) type = "BERSERKER"; else type = "HEAVY"; 
             count = (type === "TWIN") ? 2 : 1; 
         } else {
-            if (wave > 3 && r < 0.15) type = "FLANKER";
-            else if (wave > 5 && r > 0.85) type = "HEAVY";
-            else if (wave > 2 && r < 0.3) type = "SHOOTER";
-            else if (wave > 4 && r > 0.75) type = "TANK";
-            else if (wave > 1 && r > 0.3 && r < 0.5) type = "SWARM";
-            
-            if (type === "SWARM") count = 3 + floor(wave/3);
-            else if (type === "FLANKER") count = 2;
-            else count = 1;
+            if (wave > 3 && r < 0.15) type = "FLANKER"; else if (wave > 5 && r > 0.85) type = "HEAVY"; else if (wave > 2 && r < 0.3) type = "SHOOTER"; else if (wave > 4 && r < 0.75) type = "TANK"; else if (wave > 1 && r < 0.5) type = "SWARM";
+            if (type === "SWARM") count = 3 + floor(wave/3); else if (type === "FLANKER") count = 2; else count = 1;
         }
 
         let spawnRadius = width/2 + 100; 
@@ -264,19 +244,9 @@ function spawnEnemyGroup() {
             let by = player.pos.y + sin(angleCenter) * spawnRadius;
             let toPlayer = p5.Vector.sub(player.pos, createVector(bx,by)).normalize();
             let perp = createVector(-toPlayer.y, toPlayer.x);
-            
-            let e1 = new Enemy(bx, by, "P_TANK");
-            e1.pos.x = constrain(e1.pos.x, 50, WORLD_W-50); e1.pos.y = constrain(e1.pos.y, 50, WORLD_H-50);
-            enemies.push(e1);
-            
-            let e2 = new Enemy(bx + perp.x*40 - toPlayer.x*30, by + perp.y*40 - toPlayer.y*30, "P_FIGHTER");
-            e2.pos.x = constrain(e2.pos.x, 50, WORLD_W-50); e2.pos.y = constrain(e2.pos.y, 50, WORLD_H-50);
-            enemies.push(e2);
-
-            let e3 = new Enemy(bx - perp.x*40 - toPlayer.x*60, by - perp.y*40 - toPlayer.y*60, "P_MAGE");
-            e3.pos.x = constrain(e3.pos.x, 50, WORLD_W-50); e3.pos.y = constrain(e3.pos.y, 50, WORLD_H-50);
-            enemies.push(e3);
-            
+            let e1 = new Enemy(bx, by, "P_TANK"); enemies.push(e1);
+            let e2 = new Enemy(bx + perp.x*40 - toPlayer.x*30, by + perp.y*40 - toPlayer.y*30, "P_FIGHTER"); enemies.push(e2);
+            let e3 = new Enemy(bx - perp.x*40 - toPlayer.x*60, by - perp.y*40 - toPlayer.y*60, "P_MAGE"); enemies.push(e3);
             particles.push(new Shockwave(bx, by, 50, "#aaa"));
         }
         else {
@@ -284,14 +254,9 @@ function spawnEnemyGroup() {
                 let angle = angleCenter + random(-0.5, 0.5);
                 let sx = constrain(player.pos.x + cos(angle) * spawnRadius, 50, WORLD_W - 50);
                 let sy = constrain(player.pos.y + sin(angle) * spawnRadius, 50, WORLD_H - 50);
-
                 enemies.push(new Enemy(sx, sy, type));
                 particles.push(new Shockwave(sx, sy, 30, "#fff"));
-
-                if (type === "BARRIER") {
-                    enemies.push(new Enemy(sx+30, sy, "GUARD"));
-                    enemies.push(new Enemy(sx-30, sy, "GUARD"));
-                }
+                if (type === "BARRIER") { enemies.push(new Enemy(sx+30, sy, "GUARD")); enemies.push(new Enemy(sx-30, sy, "GUARD")); }
             }
         }
         r = random();
@@ -321,7 +286,6 @@ function updateProjectiles(list, targets, isPlayerOwner) {
             
             for (let t of targets) {
                 if (t.dead) continue;
-                // MERCHANT doesn't block projectiles but can take damage (though hard to hit)
                 let hitSize = (t instanceof Deployable) ? 20 : t.size/2 + 8;
                 if(p.card.id === "giga_laser") hitSize += 25; 
                 if(p.card.id === "slow_sphere") hitSize += 30; 
@@ -348,11 +312,30 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     
                     if (isPlayerOwner) {
                          t.takeDamage(p.val, p.card);
+                         
+                         if (p.card.id === "shooting_star" && p.bounceCount > 0) {
+                             p.bounceCount--;
+                             let nextTarget = null;
+                             let minD = 9999;
+                             for(let cand of targets) {
+                                 if(cand !== t && !cand.dead) {
+                                     let d = dist(p.pos.x, p.pos.y, cand.pos.x, cand.pos.y);
+                                     if(d < minD && d < 400) { minD = d; nextTarget = cand; }
+                                 }
+                             }
+                             if(nextTarget) {
+                                 let bounceDir = p5.Vector.sub(nextTarget.pos, p.pos).normalize();
+                                 let newP = new Projectile(p.pos.x, p.pos.y, bounceDir, p.card, p.val * 0.9, 30); 
+                                 newP.bounceCount = p.bounceCount;
+                                 list.push(newP);
+                             }
+                             p.dead = true;
+                             break;
+                         }
                     }
                     else {
                          let dmg = p.val;
                          for(let e of equipment) if(e.id === "e_kevlar") dmg *= 0.7;
-                         
                          t.takeDamage(dmg);
                          if(p.card.tag === "PETRIFY") t.applyStatus("STUN", 60);
                          if(p.card.tag === "SLOW") t.applyStatus("SLOW", 120);
@@ -426,7 +409,7 @@ function keyPressed() {
         }
     } 
     else if (gameState === "SKILL_TREE") {
-        if (keyCode === LEFT_ARROW) skillIndex = (skillIndex - 1 + 6) % 6; // Updated for 6 items
+        if (keyCode === LEFT_ARROW) skillIndex = (skillIndex - 1 + 6) % 6;
         if (keyCode === RIGHT_ARROW) skillIndex = (skillIndex + 1) % 6;
         if (keyCode === UP_ARROW) skillIndex = (skillIndex - 3 + 6) % 6;
         if (keyCode === DOWN_ARROW) skillIndex = (skillIndex + 3) % 6;
