@@ -112,6 +112,15 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
     if(c.category !== "EQUIP" && c.type !== "MOVE") { noStroke(); let sysColor = SYSTEM_COLORS[c.system] || "#999"; fill(sysColor); rect(x+1, y+1, w-2, 10); } 
     else if (c.category === "EQUIP") { noFill(); stroke(c.color); rect(x+3, y+3, w-6, h-6); }
     
+    // --- 変更: レベルを上部に表示 ---
+    if (showStats && c.category === "ACTION" && c.level > 1) {
+         fill(255, 200, 50);
+         textSize(8); textAlign(RIGHT, TOP);
+         text(`Lv.${c.level}`, x+w-2, y+12);
+         textAlign(CENTER, CENTER);
+    }
+    // -----------------------------
+
     noStroke(); fill(c.color); textSize(16); textAlign(CENTER, CENTER); 
     text(getIcon(c), x+w/2, y+h/2 - (showStats ? 15 : 0));
     
@@ -123,11 +132,6 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
         fill(255,255,0); textSize(8); 
         text(c.system.toUpperCase(), x+w/2, y+h/2 + 5);
 
-        if(c.level > 1) {
-             fill(255, 200, 50);
-             text(`Lv.${c.level}`, x+w/2, y+h/2 + 15);
-        }
-
         let typeMult = 1.0;
         if(c.system === "Melee") typeMult = player.getStat("melee");
         if(c.system === "Ranged") typeMult = player.getStat("range");
@@ -135,7 +139,7 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
         let lvlMult = 1.0 + ((c.level || 1) - 1) * 0.15;
         let displayPower = Math.floor(c.val * typeMult * lvlMult);
 
-        fill(200,200,255); textSize(8); text(c.id==="assassin"||c.id==="giga_laser"?"INF":`R:${c.range}`, x+w/2, y+h-32);
+        fill(200,200,255); textSize(8); text(c.id==="assassin"||c.id==="giga_laser"||c.id==="railgun"?"INF":`R:${c.range}`, x+w/2, y+h-32);
         fill(100,255,255); text(`${(c.cooldownMax/60).toFixed(1)}s`, x+w/2, y+h-22);
         fill(255,100,100); let pwrTxt = c.tag==="HEAL" ? `+${displayPower}` : `P:${displayPower}`; text(pwrTxt, x+w/2, y+h-12);
     } else if (c.type === "MOVE" && showStats) {
@@ -174,6 +178,8 @@ function getIcon(c) {
     if(c.id === "cluster" || c.id === "cluster_bomb") return "💣";
     if(c.id === "meteor") return "☄️";
     if(c.id === "shooting_star") return "🌟";
+    if(c.id === "railgun") return "🚄";
+    if(c.id === "icicle") return "🧊";
 
     if(c.system==="Magic") return "✨";
     return "⚔️";
@@ -192,7 +198,7 @@ function drawSelectionScreen(title, subtitle) {
 
         if(c.category === "ACTION") { let sysColor = SYSTEM_COLORS[c.system] || "#999"; fill(sysColor); text(`[${c.system.toUpperCase()}]`, x+cardW/2, y+60); }
         if(c.category === "ACTION") {
-            fill(200,200,255); textSize(11); text(`Range: ${c.id==="assassin"||c.id==="giga_laser"?"INF":c.range}`, x+cardW/2, y+85); text(`Cooldown: ${(c.cooldownMax/60).toFixed(1)}s`, x+cardW/2, y+100); 
+            fill(200,200,255); textSize(11); text(`Range: ${c.id==="assassin"||c.id==="giga_laser"||c.id==="railgun"?"INF":c.range}`, x+cardW/2, y+85); text(`Cooldown: ${(c.cooldownMax/60).toFixed(1)}s`, x+cardW/2, y+100); 
             
             let typeMult = 1.0;
             if(c.system === "Melee") typeMult = player.getStat("melee");
@@ -202,9 +208,7 @@ function drawSelectionScreen(title, subtitle) {
             text(`Power: ${pwr}`, x+cardW/2, y+115);
 
             if(deck.some(d => d.id === c.id)) {
-                // --- 変更箇所: テキスト短縮 ---
                 fill(255, 200, 50); text("LEVEL UP!", x+cardW/2, y+130);
-                // ---------------------------
                 fill(255); textAlign(CENTER, TOP); text(c.desc, x+10, y+150, cardW-20, 80);
             } else {
                 fill(255); textAlign(CENTER, TOP); text(c.desc, x+10, y+135, cardW-20, 80);
@@ -219,15 +223,16 @@ function drawSkillTree() {
     textAlign(CENTER); fill(255); textSize(30); text("SKILL TREE", width/2, 60);
     textSize(16); fill(255,255,100); text(`SKILL POINTS: ${player.sp}`, width/2, 90);
     
-    // Updated to 6 Skills in 2 rows
+    // --- 変更: スキルツリー数値 ---
     let skills = [
-        { name: "VITALITY", val: player.upgrades.hp, desc: "Max HP +50" },
+        { name: "VITALITY", val: player.upgrades.hp, desc: "Max HP +25" },
         { name: "STRENGTH", val: player.upgrades.atk, desc: "Damage +15%" },
-        { name: "AGILITY", val: player.upgrades.spd, desc: "Speed +2.5%" },
+        { name: "AGILITY", val: player.upgrades.spd, desc: "Speed +10%" },
         { name: "RANGE", val: player.upgrades.range, desc: "Attack Range +10%" },
-        { name: "LUCK", val: player.upgrades.luck, desc: "Drop Rate +5%" },
-        { name: "DEFENSE", val: player.upgrades.def, desc: "Dmg Cut +3%" }
+        { name: "LUCK", val: player.upgrades.luck, desc: "Drop Rate +2.5%" },
+        { name: "DEFENSE", val: player.upgrades.def, desc: "Dmg Cut +5%" }
     ];
+    // --------------------------
     
     let startX = 150; let gapX = 250; 
     let startY = 180; let gapY = 150;
