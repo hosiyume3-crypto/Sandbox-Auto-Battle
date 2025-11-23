@@ -60,7 +60,6 @@ class Enemy {
         this.size = size;
         this.col = col;
         
-        // Elite Trait Generation
         if(random() < 0.10 && type !== "MERCHANT") {
             let traits = ["POWER", "SPEED", "GIANT", "ARMOR", "REGEN"];
             this.eliteTrait = random(traits);
@@ -85,13 +84,16 @@ class Enemy {
 
     update() {
         if(this.stunTimer > 0) { this.stunTimer--; return; } 
+        
         if(this.poisonTimer > 0) {
-            if(frameCount % 30 === 0) { 
-                this.takeDamage(this.poisonDmg); 
-                particles.push(new TextParticle(this.pos.x, this.pos.y-5, floor(this.poisonDmg), "#0f0")); 
+            if(frameCount % 60 === 0) { 
+                let poisonDmg = Math.ceil(this.maxHp * 0.03);
+                this.takeDamage(poisonDmg); 
+                particles.push(new TextParticle(this.pos.x, this.pos.y-5, floor(poisonDmg), "#0f0")); 
             }
             this.poisonTimer--;
         }
+
         if(this.drainTimer > 0) {
             if(frameCount % 30 === 0) { 
                 this.takeDamage(this.drainDmg); 
@@ -156,8 +158,10 @@ class Enemy {
         } else {
             this.moveNormal();
         }
-        this.pos.x = constrain(this.pos.x, 0, WORLD_W); 
-        this.pos.y = constrain(this.pos.y, 0, WORLD_H);
+        
+        let margin = this.size / 2;
+        this.pos.x = constrain(this.pos.x, margin, WORLD_W - margin);
+        this.pos.y = constrain(this.pos.y, margin, WORLD_H - margin);
     }
 
     moveNormal() {
@@ -168,16 +172,17 @@ class Enemy {
         let d = dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y);
         let dir = p5.Vector.sub(player.pos, this.pos);
         
-        // --- MERCHANT FLEE LOGIC ---
+        // --- 変更: 闇商人は近くで応戦 ---
         if(this.type === "MERCHANT") {
-            if(d < 600) {
-                // Run away from player
-                dir.mult(-1); 
+            if(d < 200) {
+                dir = p5.Vector.sub(player.pos, this.pos); // Fight back (chase)
+            } else if(d < 600) {
+                dir.mult(-1); // Flee
             } else {
-                // Wander randomly if far
-                dir = p5.Vector.random2D();
+                dir = p5.Vector.random2D(); // Wander
             }
         }
+        // -----------------------------
 
         if(this.type.startsWith("P_")) {
              let nearestP = null;
@@ -236,7 +241,6 @@ class Enemy {
              }
         }
         else { 
-            // Basic, Tank, Swarm, Phalanx, P_TANK, P_FIGHTER, Merchant
             dir.setMag(spd); 
             this.pos.add(dir); 
         }
@@ -285,12 +289,11 @@ class Enemy {
     
     takeDamage(amt, cardEffect) {
         let reduction = 1.0;
-        if (this.type === "P_TANK" || this.type === "TANK") reduction = 0.7;
         if (this.eliteTrait === "ARMOR") reduction *= 0.5;
 
         for(let e of enemies) {
             if(e.type === "BARRIER" && e !== this && !e.dead && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < 150) {
-                reduction *= 0.5; // 50% cut
+                reduction *= 0.5; 
                 break;
             }
         }
@@ -313,7 +316,6 @@ class Enemy {
     draw() {
         push(); translate(this.pos.x, this.pos.y); 
         
-        // Elite Aura
         if(this.eliteTrait) {
             noFill(); strokeWeight(3);
             if(this.eliteTrait === "POWER") stroke(255, 50, 50, 150);
@@ -410,13 +412,12 @@ class Enemy {
             pop();
         }
         else if (this.type === "MERCHANT") {
-            // Hooded figure with a bag
             fill(this.col);
-            arc(0, 0, 30, 40, PI, TWO_PI); // Hood
-            rect(-15, 0, 30, 20); // Robe
-            fill(180, 100, 50); ellipse(10, 5, 12, 16); // Bag
-            fill(0); ellipse(0, -5, 10, 10); // Face void
-            fill(255, 255, 0); circle(-2, -5, 2); circle(2, -5, 2); // Eyes
+            arc(0, 0, 30, 40, PI, TWO_PI); 
+            rect(-15, 0, 30, 20); 
+            fill(180, 100, 50); ellipse(10, 5, 12, 16); 
+            fill(0); ellipse(0, -5, 10, 10); 
+            fill(255, 255, 0); circle(-2, -5, 2); circle(2, -5, 2); 
         }
         
         drawingContext.shadowBlur = 0;
