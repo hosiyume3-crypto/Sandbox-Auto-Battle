@@ -27,7 +27,7 @@ function initLibraries() {
     actionLibrary = [
         A("boomerang", "Boomerang", "Ranged", "RANGE", "PROJECTILE", 250, 20, 30, 180, "RARE", "Throws a piercing weapon that returns."),
         A("air_raid", "Air Raid", "Ranged", "AOE", "ATK", 999, 56, 60, 900, "LEGENDARY", "Bombards random enemies from above."), 
-        A("life_drain", "Life Drain", "Magic", "RANGE", "DEBUFF", 300, 7, 120, 420, "RARE", "Drains HP from a target for a few seconds."),
+        A("life_drain", "Life Drain", "Magic", "RANGE", "DEBUFF", 300, 0, 20, 600, "RARE", "Steals 25% of the target's Max HP."),
 
         A("gatotsu", "Gatotsu", "Melee", "MELEE", "ATK", 150, 14, 20, 300, "RARE", "Dashes forward. Hits all enemies in path."),
         A("shadow_bind", "Bind", "Ranged", "AOE", "DEBUFF", 250, 0, 20, 600, "RARE", "Deals no dmg, but Stuns enemies (2s)."),
@@ -43,7 +43,8 @@ function initLibraries() {
         A("assassin", "Assassin", "Melee", "MELEE", "ATK", 300, 42, 30, 480, "LEGENDARY", "Teleport behind the FARTHEST enemy and strike."), 
         
         {...A("turret", "Turret", "Ranged", "SUMMON", "ALLY", 0, 0, 20, 600, "RARE", "Deploy a temporary turret that shoots enemies."), color: SYSTEM_COLORS["Turret"]},
-        A("poison", "Poison", "Magic", "AOE", "DOT", 150, 3, 40, 300, "RARE", "Poisons all enemies in range (DoT)."),
+        A("poison", "Poison", "Magic", "AOE", "DOT", 150, 0, 40, 300, "RARE", "Poisons enemies (3% Max HP/sec)."),
+        
         A("repel", "Repel", "Magic", "AOE", "DEBUFF", 160, 10, 20, 420, "COMMON", "Knocks back nearby enemies and Slows them."),
 
         A("slash", "Slash", "Melee", "MELEE", "ATK", 50, 21, 20, 60, "COMMON", "Basic melee attack (AOE)."), 
@@ -79,8 +80,12 @@ function initLibraries() {
         A("beam", "Beam", "Ranged", "RANGE", "ATK", 400, 14, 40, 100, "COMMON", "Long-range, high-piercing beam."),
         
         A("rocket", "Rocket", "Ranged", "RANGE", "EXPLOSION", 350, 56, 60, 200, "LEGENDARY", "Fires an explosive that creates a large AoE blast on impact."),
-        A("cluster", "Cluster", "Ranged", "RANGE", "PROJECTILE", 250, 15, 40, 240, "RARE", "Fires a bomb that scatters smaller bombs on impact."),
         
+        // --- 変更: クラスターボム削除 -> レールガン追加 ---
+        A("cluster", "Cluster", "Ranged", "RANGE", "PROJECTILE", 250, 15, 40, 240, "RARE", "Fires a bomb that scatters smaller bombs on impact."),
+        A("railgun", "Railgun", "Ranged", "RANGE", "PROJECTILE", 999, 80, 60, 300, "LEGENDARY", "Fires a hyper-velocity shot that pierces ALL enemies."),
+        // ----------------------------------------------
+
         A("shuriken","Shuriken","Ranged","RANGE","ATK", 250, 10, 15, 30, "COMMON", "Fast cooldown mid-range throwing star."),
         A("scatter", "Scatter", "Ranged", "RANGE", "ATK", 150, 8, 10, 50, "COMMON", "Fires 3 spreading pellets."),
         A("shotgun", "Shotgun", "Ranged", "RANGE", "ATK", 100, 10, 40, 120, "RARE", "Fires 5 spreading pellets at short range."),
@@ -88,6 +93,9 @@ function initLibraries() {
         A("nova", "Nova", "Magic", "AOE", "ATK", 120, 21, 30, 180, "RARE", "A shockwave that knocks back enemies in all directions."), 
         A("fireball", "Fireball", "Magic", "RANGE", "PROJECTILE", 350, 21, 50, 150, "COMMON", "Hurls a high-power fireball."),
         A("thunder", "Thunder", "Magic", "RANGE", "DEBUFF", 400, 28, 20, 120, "RARE", "Strikes 3 random enemies with lightning."),
+        
+        {...A("shooting_star", "Star", "Magic", "RANGE", "PROJECTILE", 500, 45, 60, 240, "LEGENDARY", "Bounces between enemies up to 6 times."), bounce: 6},
+
         A("icicle", "Icicle", "Magic", "RANGE", "DEBUFF", 400, 21, 40, 90, "RARE", "Fires an ice spear that Slows the enemy's movement."),
         A("heal", "Heal", "Heal", "SELF", "HEAL", 0, 28, 40, 600, "LEGENDARY", "Restores HP to the player."),
     ];
@@ -131,6 +139,9 @@ function initLibraries() {
     actionLibrary.push(M("move_mag", "Magnet", "Item (Potion/Chest) pickup range is tripled.", "#ff0"));
     actionLibrary.push(M("move_reflect", "Deflect", "Nullifies incoming enemy projectiles from the front while moving.", "#0dd"));
     actionLibrary.push(M("move_barrage", "Barrage", "Automatically fires weak shots at nearby enemies while moving.", "#f0f"));
+    
+    actionLibrary.push(M("move_phase", "Phase", "Periodically teleports you forward while moving.", "#a0f"));
+    actionLibrary.push(M("move_drift", "Drift", "Movement has inertia and slides around.", "#fa0"));
 }
 
 function getCardById(id) {
