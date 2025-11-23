@@ -27,8 +27,10 @@ function draw() {
             shakePower *= 0.9;
             if(shakePower < 0.5) shakePower = 0;
         }
-        camX = constrain(camX, 0, WORLD_W - width);
-        camY = constrain(camY, 0, WORLD_H - (height - UI_HEIGHT));
+        // --- 変更: フィールド端でもカメラ中心固定のため、constrainを削除 ---
+        // camX = constrain(camX, 0, WORLD_W - width);
+        // camY = constrain(camY, 0, WORLD_H - (height - UI_HEIGHT));
+        // ---------------------------------------------------------------
     }
 
     push();
@@ -116,12 +118,10 @@ function updateEnemies() {
         e.update();
         if (e.dead) {
             totalKills++;
-            // --- 変更: 10キルごとにスキルポイント & UI表示 ---
             if (totalKills % 10 === 0) {
                 player.sp++;
                 gameState = "SKILL_TREE";
             }
-            // ---------------------------------------------
 
             if (e.type === "MERCHANT") {
                 particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
@@ -166,10 +166,16 @@ function updateDrops() {
         let d = drops[i];
         d.update();
 
-        if (d.type === "POTION" && d.age > 300) {
+        // --- 変更: ポーションおよびハートは時間経過(600f=10s)で消える ---
+        if ((d.type === "POTION" || d.type === "HEART") && d.age > 600) {
             drops.splice(i, 1);
             continue;
         }
+        // ----------------------------------------------------------
+
+        // --- 変更: HP満タンならハートは吸い寄せず、拾わない ---
+        if (d.type === "HEART" && player.hp >= player.maxHp) continue;
+        // -------------------------------------------------
 
         let distToP = dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y);
         if (distToP < (player.size + d.size) * pickupRangeMult) {
@@ -196,11 +202,11 @@ function updateDrops() {
                     addShake(5);
                     drops.splice(i, 1);
                 } else if (d.type === "HEART") {
-                    if (player.hp < player.maxHp) {
-                        player.heal(Math.ceil(player.maxHp * 0.10)); 
-                        particles.push(new TextParticle(player.pos.x, player.pos.y, "♥", "#f00"));
-                        drops.splice(i, 1);
-                    }
+                    // --- 変更: HP回復処理 (既に上のcontinueでHP満タン時は弾いている) ---
+                    player.heal(Math.ceil(player.maxHp * 0.10)); 
+                    particles.push(new TextParticle(player.pos.x, player.pos.y, "♥", "#f00"));
+                    drops.splice(i, 1);
+                    // --------------------------------------------------------
                 }
             }
         }
@@ -307,19 +313,6 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                 if(p.card.id === "giga_laser") hitSize += 25; 
                 if(p.card.id === "slow_sphere") hitSize += 30; 
 
-                // --- 変更: レールガン当たり判定 (線分) ---
-                if (p.card.id === "railgun") {
-                    let beamStart = p.pos.copy();
-                    let beamEnd = p.pos.copy().add(p.vel.copy().normalize().mult(1000)); // Length 1000
-                    let d = distToSegment(t.pos, beamStart, beamEnd);
-                    if (d < hitSize + 15) { // Thick beam
-                        t.takeDamage(p.val, p.card);
-                        createImpactSparks(t.pos.x, t.pos.y, random(TWO_PI), p.color, 5);
-                    }
-                    continue; // Railgun handles its own collision logic per frame
-                }
-                // -------------------------------------
-
                 if (dist(p.pos.x, p.pos.y, t.pos.x, t.pos.y) < hitSize) {
                     if (p.card.tag === "EXPLOSION") {
                         createExplosion(p.pos.x, p.pos.y, p.val, p.card.range, isPlayerOwner);
@@ -393,14 +386,6 @@ function updateProjectiles(list, targets, isPlayerOwner) {
     }
 }
 
-// Helper for Railgun
-function distToSegment(p, v, w) {
-    const l2 = distSq(v, w);
-    if (l2 === 0) return dist(p.x, p.y, v.x, v.y);
-    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
-    t = Math.max(0, Math.min(1, t));
-    return dist(p.x, p.y, v.x + t * (w.x - v.x), v.y + t * (w.y - v.y));
-}
 function distSq(v, w) { return (v.x - w.x)*(v.x - w.x) + (v.y - w.y)*(v.y - w.y); }
 
 function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
