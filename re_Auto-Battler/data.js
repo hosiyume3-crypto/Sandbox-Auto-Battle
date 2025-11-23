@@ -27,7 +27,10 @@ function initLibraries() {
     actionLibrary = [
         A("boomerang", "Boomerang", "Ranged", "RANGE", "PROJECTILE", 250, 20, 30, 180, "RARE", "Throws a piercing weapon that returns."),
         A("air_raid", "Air Raid", "Ranged", "AOE", "ATK", 999, 56, 60, 900, "LEGENDARY", "Bombards random enemies from above."), 
-        A("life_drain", "Life Drain", "Magic", "RANGE", "DEBUFF", 300, 0, 20, 600, "RARE", "Steals 25% of the target's Max HP."),
+        
+        // --- 変更: Life Drain 射程100 ---
+        A("life_drain", "Life Drain", "Magic", "RANGE", "DEBUFF", 100, 0, 20, 600, "RARE", "Steals 25% of the target's Max HP."),
+        // ------------------------------
 
         A("gatotsu", "Gatotsu", "Melee", "MELEE", "ATK", 150, 14, 20, 300, "RARE", "Dashes forward. Hits all enemies in path."),
         A("shadow_bind", "Bind", "Ranged", "AOE", "DEBUFF", 250, 0, 20, 600, "RARE", "Deals no dmg, but Stuns enemies (2s)."),
@@ -78,22 +81,22 @@ function initLibraries() {
         
         A("flame", "Flame", "Magic", "RANGE", "PROJECTILE", 120, 5, 10, 5, "COMMON", "Low power, short-range, ultra-fast piercing fire stream."),
         
-        // --- 変更: ビーム射程150 ---
         A("beam", "Beam", "Magic", "RANGE", "PROJECTILE", 150, 14, 40, 100, "COMMON", "High-piercing beam."),
-        // -------------------------
         
         A("rocket", "Rocket", "Ranged", "RANGE", "EXPLOSION", 350, 56, 60, 200, "LEGENDARY", "Fires an explosive that creates a large AoE blast on impact."),
         
         A("cluster", "Cluster", "Ranged", "RANGE", "PROJECTILE", 250, 15, 40, 240, "RARE", "Fires a bomb that scatters smaller bombs on impact."),
         
-        // --- 変更: レールガン CT 10秒 (600f) ---
-        A("railgun", "Railgun", "Ranged", "RANGE", "PROJECTILE", 999, 80, 60, 600, "LEGENDARY", "Fires a massive sustained laser."),
-        // ------------------------------------
+        // --- 変更: レールガン削除 (行を削除しました) ---
 
         A("shuriken","Shuriken","Ranged","RANGE","ATK", 250, 10, 15, 30, "COMMON", "Fast cooldown mid-range throwing star."),
         A("scatter", "Scatter", "Ranged", "RANGE", "ATK", 150, 8, 10, 50, "COMMON", "Fires 3 spreading pellets."),
         A("shotgun", "Shotgun", "Ranged", "RANGE", "ATK", 100, 10, 40, 120, "RARE", "Fires 5 spreading pellets at short range."),
-        A("sniper", "Sniper", "Ranged", "RANGE", "ATK", 600, 70, 80, 300, "RARE", "Ultra-long range, high power, piercing single shot."),
+        
+        // --- 変更: Sniper 射程200, 攻撃力40, CT7秒(420f) ---
+        A("sniper", "Sniper", "Ranged", "RANGE", "ATK", 200, 40, 80, 420, "RARE", "High power, short range single shot."),
+        // -----------------------------------------------
+        
         A("nova", "Nova", "Magic", "AOE", "ATK", 120, 21, 30, 180, "RARE", "A shockwave that knocks back enemies in all directions."), 
         A("fireball", "Fireball", "Magic", "RANGE", "PROJECTILE", 350, 21, 50, 150, "COMMON", "Hurls a high-power fireball."),
         
