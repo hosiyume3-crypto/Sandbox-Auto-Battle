@@ -9,6 +9,8 @@ function setup() {
     camY = WORLD_H/2 - height/2;
 }
 
+let totalKills = 0;
+
 // --- MAIN LOOP ---
 function draw() {
     background(10);
@@ -113,6 +115,14 @@ function updateEnemies() {
         let e = enemies[i];
         e.update();
         if (e.dead) {
+            totalKills++;
+            // --- 変更: 10キルごとにスキルポイント & UI表示 ---
+            if (totalKills % 10 === 0) {
+                player.sp++;
+                gameState = "SKILL_TREE";
+            }
+            // ---------------------------------------------
+
             if (e.type === "MERCHANT") {
                 particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
                 createExplosion(e.pos.x, e.pos.y, 0, 50, false, "#a0a");
@@ -124,7 +134,12 @@ function updateEnemies() {
                 let baseDropRate = 0.25; 
                 baseDropRate += player.getStat("dropRateAdd");
                 
-                if(random() < baseDropRate) spawnDrop(e.pos.x, e.pos.y, random() < 0.15 ? "CHEST" : "POTION");
+                if(random() < baseDropRate) {
+                    let r = random();
+                    if (r < 0.10) spawnDrop(e.pos.x, e.pos.y, "CHEST");
+                    else if (r < 0.60) spawnDrop(e.pos.x, e.pos.y, "POTION");
+                    else spawnDrop(e.pos.x, e.pos.y, "HEART");
+                }
                 
                 let vamp = player.getStat("vampire");
                 if(vamp > 0 && random() < 0.2) {
@@ -180,6 +195,12 @@ function updateDrops() {
                     triggerFlash(30);
                     addShake(5);
                     drops.splice(i, 1);
+                } else if (d.type === "HEART") {
+                    if (player.hp < player.maxHp) {
+                        player.heal(Math.ceil(player.maxHp * 0.10)); 
+                        particles.push(new TextParticle(player.pos.x, player.pos.y, "♥", "#f00"));
+                        drops.splice(i, 1);
+                    }
                 }
             }
         }
@@ -190,10 +211,6 @@ function checkLevelUp() {
     enemiesToNextLevel--;
     if (enemiesToNextLevel <= 0) {
         player.level++;
-        if(player.level % 5 === 0) {
-            player.sp++;
-            particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKILL POINT!", "#ff0"));
-        }
         generateRewards("ACTION"); 
         gameState = "LEVEL_UP";
         rewardIndex = 0;
@@ -290,6 +307,19 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                 if(p.card.id === "giga_laser") hitSize += 25; 
                 if(p.card.id === "slow_sphere") hitSize += 30; 
 
+                // --- 変更: レールガン当たり判定 (線分) ---
+                if (p.card.id === "railgun") {
+                    let beamStart = p.pos.copy();
+                    let beamEnd = p.pos.copy().add(p.vel.copy().normalize().mult(1000)); // Length 1000
+                    let d = distToSegment(t.pos, beamStart, beamEnd);
+                    if (d < hitSize + 15) { // Thick beam
+                        t.takeDamage(p.val, p.card);
+                        createImpactSparks(t.pos.x, t.pos.y, random(TWO_PI), p.color, 5);
+                    }
+                    continue; // Railgun handles its own collision logic per frame
+                }
+                // -------------------------------------
+
                 if (dist(p.pos.x, p.pos.y, t.pos.x, t.pos.y) < hitSize) {
                     if (p.card.tag === "EXPLOSION") {
                         createExplosion(p.pos.x, p.pos.y, p.val, p.card.range, isPlayerOwner);
@@ -325,7 +355,7 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                              }
                              if(nextTarget) {
                                  let bounceDir = p5.Vector.sub(nextTarget.pos, p.pos).normalize();
-                                 let newP = new Projectile(p.pos.x, p.pos.y, bounceDir, p.card, p.val * 0.9, 30); 
+                                 let newP = new Projectile(p.pos.x, p.pos.y, bounceDir, p.card, p.val * 0.9, 5); // Keep slow
                                  newP.bounceCount = p.bounceCount;
                                  list.push(newP);
                              }
@@ -348,7 +378,7 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                          }
                     }
                     
-                    createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, p.color, 8);
+                    createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, p.color, 12); 
                     particles.push(new Shockwave(p.pos.x, p.pos.y, 30, p.color));
                     
                     if(!p.piercing && !p.isOrbiter) p.dead = true;
@@ -362,6 +392,16 @@ function updateProjectiles(list, targets, isPlayerOwner) {
         if (p.dead) list.splice(i, 1);
     }
 }
+
+// Helper for Railgun
+function distToSegment(p, v, w) {
+    const l2 = distSq(v, w);
+    if (l2 === 0) return dist(p.x, p.y, v.x, v.y);
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return dist(p.x, p.y, v.x + t * (w.x - v.x), v.y + t * (w.y - v.y));
+}
+function distSq(v, w) { return (v.x - w.x)*(v.x - w.x) + (v.y - w.y)*(v.y - w.y); }
 
 function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
     let col = colOverride || "#f50";
@@ -385,9 +425,9 @@ function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
 
 function createImpactSparks(x, y, angle, col, count) {
     for(let i=0; i<count; i++) {
-        let spd = random(3, 8);
-        let spread = random(-0.8, 0.8);
-        particles.push(new Spark(x, y, col, angle + spread, spd, random(10, 20)));
+        let spd = random(4, 10);
+        let spread = random(-1.0, 1.0);
+        particles.push(new Spark(x, y, col, angle + spread, spd, random(15, 25)));
     }
 }
 
@@ -451,7 +491,7 @@ function startGame() {
     player = new Player();
     enemies = []; drops = []; projectiles = []; enemyProjectiles = []; particles = []; deployables = []; puddles = [];
     score = 0; wave = 1; enemiesToNextLevel = 5;
-    actionRewardCount = 0; 
+    totalKills = 0; 
     player.pos = createVector(WORLD_W/2, WORLD_H/2);
     camX = WORLD_W/2 - width/2;
     camY = WORLD_H/2 - height/2;
@@ -472,7 +512,6 @@ function generateRewards(type) {
     if(pool.length === 0) pool = (type==="ACTION") ? actionLibrary : equipLibrary;
 
     let availablePool = pool; 
-    if (type === "ACTION") actionRewardCount++;
 
     for(let i=0; i<CARD_CHOICES; i++) {
         let rarityRoll = random();
