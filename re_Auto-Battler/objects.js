@@ -83,7 +83,15 @@ class Drop {
             fill(255,100,100); noStroke(); 
             beginShape(); vertex(-5,5); vertex(5,5); vertex(5,-5); vertex(3,-8); vertex(-3,-8); vertex(-5,-5); endShape(CLOSE); 
             fill(255); circle(2,-2,3); 
-        } 
+        } else if (this.type === "HEART") {
+            drawingContext.shadowColor = "#f00"; 
+            fill(255, 0, 0); noStroke();
+            beginShape();
+            vertex(0, 5);
+            bezierVertex(-5, 0, -10, -5, 0, -10);
+            bezierVertex(10, -5, 5, 0, 0, 5);
+            endShape(CLOSE);
+        }
         else { 
             drawingContext.shadowColor = "#fb0"; 
             fill(200, 150, 0); stroke(255,200,50); strokeWeight(2); 
@@ -98,15 +106,12 @@ class Projectile {
         this.pos = createVector(x, y); this.vel = dirVec.copy().setMag(speed);
         this.card = card; this.val = val; this.color = card.color || "#fff";
         this.dead = false; this.life = (card.id === "flame" || card.id === "flamethrower") ? 20 : 60; 
-        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun");
+        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun" || card.id === "icicle");
         this.isOrbiter = false; this.orbitAngle = 0; this.orbitRadius = 0;
         
-        // Bouncing logic for Shooting Star
         this.bounceCount = card.bounce || 0;
 
         if(card.id === "slow_sphere") this.life = 180; 
-        
-        // Railgun is very fast, short life visually but hits instantly
         if(card.id === "railgun") this.life = 10; 
 
         this.isBoomerang = (card.id === "boomerang");
@@ -161,12 +166,19 @@ class Projectile {
             fill(255); rect(-25, -8, 50, 16); 
         }
         else if(this.card.id === "railgun") {
+            // --- 変更: レールガン描画 ---
             rotate(this.vel.heading());
-            fill(100, 200, 255); rect(-40, -4, 80, 8);
-            fill(255); rect(-30, -2, 60, 4);
+            fill(100, 200, 255); rect(-40, -4, 1200, 8); // Very long visual
+            fill(255); rect(-30, -2, 1200, 4);
+            // -------------------------
         }
         else if(this.card.id === "slow_sphere") {
              circle(0,0,30); 
+        }
+        else if(this.card.id === "icicle") {
+             rotate(this.vel.heading());
+             fill(200, 255, 255);
+             triangle(10, 0, -10, 4, -10, -4);
         }
         else if(this.isBoomerang) { 
             rotate(frameCount * 0.5); 
