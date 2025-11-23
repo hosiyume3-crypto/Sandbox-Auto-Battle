@@ -38,7 +38,7 @@ function initLibraries() {
         A("flamethrower", "Flamer", "Magic", "RANGE", "PROJECTILE", 180, 4, 90, 360, "RARE", "Emits a continuous stream of fire."),
         A("backstep", "Backstep", "Ranged", "RANGE", "PROJECTILE", 200, 14, 20, 180, "COMMON", "Shoots and quickly retreats backwards."),
 
-        A("giga_laser", "GigaLaser", "Magic", "RANGE", "PROJECTILE", 400, 56, 60, 500, "RARE", "Fires a massive, piercing wide laser."),
+        A("giga_laser", "GigaLaser", "Magic", "RANGE", "PROJECTILE", 400, 40, 60, 500, "RARE", "Fires a massive, piercing wide laser."),
         A("orbit_fire", "Orbiter", "Magic", "SELF", "BUFF", 150, 14, 0, 600, "RARE", "Summons 4 fireballs that circle you for 5s."),
         A("assassin", "Assassin", "Melee", "MELEE", "ATK", 300, 42, 30, 480, "LEGENDARY", "Teleport behind the FARTHEST enemy and strike."), 
         
@@ -62,7 +62,7 @@ function initLibraries() {
 
         A("vortex", "Vortex", "Melee", "AOE", "ATK", 100, 17, 40, 420, "COMMON", "Slashes the area, pulling enemies towards the center."), 
         
-        A("charge", "Charge", "Melee", "MELEE", "ATK", 100, 45, 30, 420, "COMMON", "Casts for 1s, then dashes with massive knockback."), 
+        A("charge", "Charge", "Melee", "MELEE", "ATK", 70, 45, 30, 420, "COMMON", "Casts for 1s, then dashes with massive knockback."), 
         
         A("stomp", "Stomp", "Melee", "AOE", "ATK", 80, 35, 50, 420, "RARE", "Slams the ground, strongly knocking back enemies in a large area."), 
         A("cleave", "Cleave", "Magic", "AOE", "ATK", 70, 28, 40, 420, "COMMON", "A wide forward sweep attack."), 
@@ -76,15 +76,19 @@ function initLibraries() {
         A("bow", "Bow", "Ranged", "RANGE", "ATK", 300, 14, 30, 80, "COMMON", "Basic long-range arrow shot."), 
         A("m_gun", "M.Gun", "Ranged", "RANGE", "ATK", 150, 5, 5, 12, "COMMON", "Low power, rapid-fire, low range."),
         
-        A("flame", "Flame", "Ranged", "RANGE", "ATK", 120, 5, 10, 5, "COMMON", "Low power, short-range, ultra-fast piercing fire stream."),
-        A("beam", "Beam", "Ranged", "RANGE", "ATK", 400, 14, 40, 100, "COMMON", "Long-range, high-piercing beam."),
+        A("flame", "Flame", "Magic", "RANGE", "PROJECTILE", 120, 5, 10, 5, "COMMON", "Low power, short-range, ultra-fast piercing fire stream."),
+        
+        // --- 変更: ビーム射程150 ---
+        A("beam", "Beam", "Magic", "RANGE", "PROJECTILE", 150, 14, 40, 100, "COMMON", "High-piercing beam."),
+        // -------------------------
         
         A("rocket", "Rocket", "Ranged", "RANGE", "EXPLOSION", 350, 56, 60, 200, "LEGENDARY", "Fires an explosive that creates a large AoE blast on impact."),
         
-        // --- 変更: クラスターボム削除 -> レールガン追加 ---
         A("cluster", "Cluster", "Ranged", "RANGE", "PROJECTILE", 250, 15, 40, 240, "RARE", "Fires a bomb that scatters smaller bombs on impact."),
-        A("railgun", "Railgun", "Ranged", "RANGE", "PROJECTILE", 999, 80, 60, 300, "LEGENDARY", "Fires a hyper-velocity shot that pierces ALL enemies."),
-        // ----------------------------------------------
+        
+        // --- 変更: レールガン CT 10秒 (600f) ---
+        A("railgun", "Railgun", "Ranged", "RANGE", "PROJECTILE", 999, 80, 60, 600, "LEGENDARY", "Fires a massive sustained laser."),
+        // ------------------------------------
 
         A("shuriken","Shuriken","Ranged","RANGE","ATK", 250, 10, 15, 30, "COMMON", "Fast cooldown mid-range throwing star."),
         A("scatter", "Scatter", "Ranged", "RANGE", "ATK", 150, 8, 10, 50, "COMMON", "Fires 3 spreading pellets."),
@@ -92,11 +96,12 @@ function initLibraries() {
         A("sniper", "Sniper", "Ranged", "RANGE", "ATK", 600, 70, 80, 300, "RARE", "Ultra-long range, high power, piercing single shot."),
         A("nova", "Nova", "Magic", "AOE", "ATK", 120, 21, 30, 180, "RARE", "A shockwave that knocks back enemies in all directions."), 
         A("fireball", "Fireball", "Magic", "RANGE", "PROJECTILE", 350, 21, 50, 150, "COMMON", "Hurls a high-power fireball."),
-        A("thunder", "Thunder", "Magic", "RANGE", "DEBUFF", 400, 28, 20, 120, "RARE", "Strikes 3 random enemies with lightning."),
+        
+        A("thunder", "Thunder", "Magic", "RANGE", "DEBUFF", 400, 28, 20, 420, "RARE", "Strikes 3 random enemies with lightning."),
         
         {...A("shooting_star", "Star", "Magic", "RANGE", "PROJECTILE", 500, 45, 60, 240, "LEGENDARY", "Bounces between enemies up to 6 times."), bounce: 6},
 
-        A("icicle", "Icicle", "Magic", "RANGE", "DEBUFF", 400, 21, 40, 90, "RARE", "Fires an ice spear that Slows the enemy's movement."),
+        A("icicle", "Icicle", "Magic", "RANGE", "DEBUFF", 100, 21, 40, 90, "RARE", "Throws 2 ice spears that Slow enemies."),
         A("heal", "Heal", "Heal", "SELF", "HEAL", 0, 28, 40, 600, "LEGENDARY", "Restores HP to the player."),
     ];
 
@@ -139,9 +144,7 @@ function initLibraries() {
     actionLibrary.push(M("move_mag", "Magnet", "Item (Potion/Chest) pickup range is tripled.", "#ff0"));
     actionLibrary.push(M("move_reflect", "Deflect", "Nullifies incoming enemy projectiles from the front while moving.", "#0dd"));
     actionLibrary.push(M("move_barrage", "Barrage", "Automatically fires weak shots at nearby enemies while moving.", "#f0f"));
-    
     actionLibrary.push(M("move_phase", "Phase", "Periodically teleports you forward while moving.", "#a0f"));
-    actionLibrary.push(M("move_drift", "Drift", "Movement has inertia and slides around.", "#fa0"));
 }
 
 function getCardById(id) {
