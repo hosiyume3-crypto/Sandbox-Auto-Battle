@@ -3,10 +3,11 @@
 class Player {
     constructor() {
         this.pos = createVector(WORLD_W/2, WORLD_H/2);
+        this.vel = createVector(0, 0); // Drift用
         this.size = 24;
         this.level = 1;
         this.sp = 0;
-        this.upgrades = { hp: 0, atk: 0, spd: 0, range: 0, luck: 0, def: 0 }; // Added 3 types
+        this.upgrades = { hp: 0, atk: 0, spd: 0, range: 0, luck: 0, def: 0 }; 
         
         this.hp = 200; this.maxHp = 200;
         this.potionStock = 0;
@@ -23,6 +24,7 @@ class Player {
         this.invincibleTimer = 0;
         this.baseSpeed = 3.5;
         this.warpTimer = 0;
+        this.phaseTimer = 0; // Phase Step用
         this.defBuffTimer = 0; 
         this.chargeTimer = 0; 
         
@@ -43,11 +45,11 @@ class Player {
             }
         }
         // SKILL TREE UPGRADES
-        if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.15); // +15% per level
+        if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.15); 
         if(type === "speed") val *= (1 + this.upgrades.spd * 0.025);
         
-        if(type === "rangeAdd") val += this.upgrades.range * 0.10; // +10% Range
-        if(type === "dropRateAdd") val += this.upgrades.luck * 0.05; // +5% Drop
+        if(type === "rangeAdd") val += this.upgrades.range * 0.10; 
+        if(type === "dropRateAdd") val += this.upgrades.luck * 0.05; 
 
         for(let e of equipment) {
             if(e.id === "e_rage") {
@@ -67,7 +69,7 @@ class Player {
     applyStatus(type, duration) {
         if(type === "STUN") { this.status.stun = duration; particles.push(new TextParticle(this.pos.x, this.pos.y-20, "STUNNED", "#ff0")); }
         if(type === "SLOW") { this.status.slow = duration; particles.push(new TextParticle(this.pos.x, this.pos.y-20, "SLOW", "#88f")); }
-        if(type === "POISON") { this.status.poison = duration; this.status.poisonDmg = 1; particles.push(new TextParticle(this.pos.x, this.pos.y-20, "POISON", "#0f0")); }
+        if(type === "POISON") { this.status.poison = duration; particles.push(new TextParticle(this.pos.x, this.pos.y-20, "POISON", "#0f0")); }
     }
 
     update() {
@@ -93,26 +95,45 @@ class Player {
 
         if (this.status.stun > 0) this.status.stun--;
         if (this.status.slow > 0) this.status.slow--;
+        
         if (this.status.poison > 0) {
             this.status.poison--;
-            if(frameCount % 60 === 0) this.takeDamage(1); 
+            if(frameCount % 60 === 0) {
+                let poisonDmg = Math.ceil(this.maxHp * 0.03);
+                this.takeDamage(poisonDmg); 
+            }
         }
 
         if (this.potionUseTimer > 0) this.potionUseTimer--;
-        if (this.hp <= this.maxHp * 0.5 && this.potionStock > 0 && this.potionUseTimer <= 0) {
-            this.potionStock--;
-            this.heal(60);
-            this.potionUseTimer = 60;
-            particles.push(new TextParticle(this.pos.x, this.pos.y - 20, "AUTO POTION", "#0f0"));
-            particles.push(new Shockwave(this.pos.x, this.pos.y, 40, "#0f0"));
+        
+        // --- 変更: オートポーション (HP50%以下で発動, CT5秒) ---
+        if (this.potionStock > 0 && this.potionUseTimer <= 0) {
+            if (this.hp <= this.maxHp * 0.5) {
+                this.potionStock--;
+                let healAmount = Math.floor(this.maxHp * 0.30); // 30%回復
+                this.heal(healAmount);
+                this.potionUseTimer = 300; // CT 5秒 (300f)
+                particles.push(new TextParticle(this.pos.x, this.pos.y - 20, "AUTO POTION", "#0f0"));
+                particles.push(new Shockwave(this.pos.x, this.pos.y, 40, "#0f0"));
+            }
         }
+        // ---------------------------------------------
 
         if (this.hp <= 0) { gameState = "GAME_OVER"; return; }
         for(let c of deck) { if(c.currentCooldown > 0) c.currentCooldown--; }
         if (this.invincibleTimer > 0) this.invincibleTimer--;
         if (this.warpTimer > 0) this.warpTimer--;
+        if (this.phaseTimer > 0) this.phaseTimer--;
         if (this.defBuffTimer > 0) this.defBuffTimer--;
         if (this.chargeTimer > 0) this.chargeTimer--;
+        
+        // Friction for Drift
+        if(this.activeMoveCard && this.activeMoveCard.id === "move_drift") {
+             this.pos.add(this.vel);
+             this.vel.mult(0.92); // 滑る慣性
+        } else {
+             this.vel.mult(0);
+        }
 
         if (this.invincibleTimer <= 0) {
             for (let e of enemies) {
@@ -127,7 +148,6 @@ class Player {
                          createImpactSparks(e.pos.x, e.pos.y, p5.Vector.sub(e.pos, this.pos).heading(), "#f00", 10);
                          addShake(2);
                     } else {
-                        // MERCHANT deals no damage
                         if (e.type !== "MERCHANT") {
                             let collisionDmg = e.dmg;
                             if(e.eliteTrait === "POWER") collisionDmg *= 1.5;
@@ -254,7 +274,7 @@ class Player {
             return;
         }
 
-        let effectiveRange = (card.id === "assassin" || card.id === "giga_laser" || card.id === "slow_sphere") ? 9999 : card.range;
+        let effectiveRange = (card.id === "assassin" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "life_drain") ? 9999 : card.range;
         if(card.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
         
         if (dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y) <= effectiveRange) {
@@ -307,10 +327,30 @@ class Player {
                 dir = vecToTarget.normalize();
             }
         }
-        this.pos.add(dir.mult(speed));
+        
+        // --- 新移動カードの処理 ---
+        if(this.activeMoveCard && this.activeMoveCard.id === "move_drift") {
+            let acc = dir.copy().setMag(speed * 0.05);
+            this.vel.add(acc);
+            this.vel.limit(speed * 1.5);
+        } 
+        else if(this.activeMoveCard && this.activeMoveCard.id === "move_phase") {
+            this.pos.add(dir.mult(speed));
+            if(this.state === "MOVING") {
+                if(this.phaseTimer <= 0) {
+                    this.pos.add(dir.copy().setMag(50));
+                    particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#a0f", 10));
+                    this.phaseTimer = 60;
+                }
+            }
+        }
+        else {
+            this.pos.add(dir.mult(speed));
+        }
+        // -----------------------
         
         if (this.state !== "LOOTING" && this.currentCard) {
-             let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere") ? 9999 : this.currentCard.range;
+             let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere" || this.currentCard.id === "life_drain") ? 9999 : this.currentCard.range;
              if(this.currentCard.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
              
              if (dist(this.pos.x, this.pos.y, this.target.pos.x, this.target.pos.y) <= effectiveRange) {
@@ -519,10 +559,14 @@ class Player {
                 let dir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                 
                 if (c.id === "life_drain") {
-                    this.target.applyDebuff("DRAIN", Math.ceil(finalVal/10), 240);
+                    let drainAmt = Math.floor(this.target.maxHp * 0.25);
+                    this.target.takeDamage(drainAmt, c);
+                    this.heal(drainAmt);
                     particles.push(new TextParticle(this.target.pos.x, this.target.pos.y, "DRAIN", "#a0f"));
+                    particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 40, "#a0f"));
                     return; 
                 }
+                
                 if (c.id === "m_gun") dir.rotate(random(-0.1, 0.1));
                 if (c.id === "flamethrower") dir.rotate(random(-0.2, 0.2));
 
@@ -549,6 +593,10 @@ class Player {
                 } else if (c.id === "cluster") {
                      let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 15);
                      p.drag = 0.95; 
+                     projectiles.push(p);
+                } else if (c.id === "cluster_bomb") {
+                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 15);
+                     p.drag = 0.90; 
                      projectiles.push(p);
                 } else {
                     let pSpeed = (c.id === "flame") ? 8 : 15;
@@ -639,6 +687,14 @@ class Player {
             else if (this.activeMoveCard.id === "move_strafe") { arc(0,0,40,40, frameCount*0.1, frameCount*0.1 + PI); }
             else if (this.activeMoveCard.id === "move_kite") { circle(0,0,30); line(0,0,0,-25); }
             else if (this.activeMoveCard.id === "move_barrage") { drawingContext.setLineDash([2, 2]); circle(0,0,35); drawingContext.setLineDash([]); }
+            else if (this.activeMoveCard.id === "move_phase") { 
+                drawingContext.setLineDash([15, 5]); circle(0,0, 35); drawingContext.setLineDash([]);
+                if(this.phaseTimer > 0) { noStroke(); fill(160,0,255,100); circle(0,0,35 * (this.phaseTimer/60)); }
+            }
+            else if (this.activeMoveCard.id === "move_drift") { 
+                strokeWeight(2); circle(0,0,35); 
+                line(-15, 5, -25, 15); line(15, 5, 25, 15); // Tires mark style
+            }
             else { circle(0,0,35); }
         }
         if(this.defBuffTimer > 0) { noFill(); stroke(0,0,255); circle(0,0,28); }
