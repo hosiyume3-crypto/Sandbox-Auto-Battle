@@ -98,10 +98,16 @@ class Projectile {
         this.pos = createVector(x, y); this.vel = dirVec.copy().setMag(speed);
         this.card = card; this.val = val; this.color = card.color || "#fff";
         this.dead = false; this.life = (card.id === "flame" || card.id === "flamethrower") ? 20 : 60; 
-        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere");
+        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun");
         this.isOrbiter = false; this.orbitAngle = 0; this.orbitRadius = 0;
         
+        // Bouncing logic for Shooting Star
+        this.bounceCount = card.bounce || 0;
+
         if(card.id === "slow_sphere") this.life = 180; 
+        
+        // Railgun is very fast, short life visually but hits instantly
+        if(card.id === "railgun") this.life = 10; 
 
         this.isBoomerang = (card.id === "boomerang");
         this.returnTimer = 0; 
@@ -154,6 +160,11 @@ class Projectile {
             fill(this.color); rect(-30, -15, 60, 30); 
             fill(255); rect(-25, -8, 50, 16); 
         }
+        else if(this.card.id === "railgun") {
+            rotate(this.vel.heading());
+            fill(100, 200, 255); rect(-40, -4, 80, 8);
+            fill(255); rect(-30, -2, 60, 4);
+        }
         else if(this.card.id === "slow_sphere") {
              circle(0,0,30); 
         }
@@ -167,6 +178,11 @@ class Projectile {
         else if(this.card.id === "bow" || this.card.id === "backstep") {
             rotate(this.vel.heading());
             fill(255); triangle(5,0, -5,-4, -5,4);
+        }
+        else if(this.card.id === "shooting_star") {
+            rotate(this.vel.heading());
+            fill(255, 255, 100);
+            beginShape(); vertex(10,0); vertex(-5,5); vertex(-5,-5); endShape(CLOSE);
         }
         else if(this.card.tag === "EXPLOSION") circle(0, 0, 14);
         else circle(0, 0, 10); 
