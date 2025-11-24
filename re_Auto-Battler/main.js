@@ -1,6 +1,6 @@
 /* Sandbox Auto-Battler V35 - Main Loop & Game Logic */
 
-// --- ASSETS & DATA ---
+// ... (setup, draw等は変更なし)
 function setup() {
     createCanvas(VIEW_W, VIEW_H + UI_HEIGHT);
     frameRate(60);
@@ -11,7 +11,6 @@ function setup() {
 
 let totalKills = 0;
 
-// --- MAIN LOOP ---
 function draw() {
     background(10);
     
@@ -27,10 +26,8 @@ function draw() {
             shakePower *= 0.9;
             if(shakePower < 0.5) shakePower = 0;
         }
-        // --- 変更: フィールド端でもカメラ中心固定のため、constrainを削除 ---
         // camX = constrain(camX, 0, WORLD_W - width);
         // camY = constrain(camY, 0, WORLD_H - (height - UI_HEIGHT));
-        // ---------------------------------------------------------------
     }
 
     push();
@@ -64,12 +61,12 @@ function draw() {
         else if (gameState === "GAME_OVER") drawGameOver();
     }
 }
-
 function addShake(amount) { shakePower = min(shakePower + amount, 25); }
 function triggerFlash(amount) { screenFlash = min(screenFlash + amount, 150); }
 
 // --- LOGIC ---
 function updateGame() {
+    // ... (変更なし)
     const scaleFactor = Math.floor((wave - 1) / 5);
     let baseSpawnRate = 360; 
     let rateDecrease = Math.min(180, wave * 10 + scaleFactor * 30); 
@@ -92,6 +89,7 @@ function updateGame() {
     }
 }
 
+// ... (updateDeployables, updatePuddles は変更なし)
 function updateDeployables() {
     for (let i = deployables.length - 1; i >= 0; i--) {
         deployables[i].update();
@@ -122,6 +120,13 @@ function updateEnemies() {
                 player.sp++;
                 gameState = "SKILL_TREE";
             }
+
+            // --- 追加: 錬金術によるドロップ ---
+            if (e.isAlchemized && random() < 0.6) { // 60%でポーション
+                spawnDrop(e.pos.x, e.pos.y, "POTION");
+                particles.push(new TextParticle(e.pos.x, e.pos.y, "TRANSMUTED!", "#ff0"));
+            }
+            // -----------------------------
 
             if (e.type === "MERCHANT") {
                 particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
@@ -158,6 +163,7 @@ function updateEnemies() {
 
 function spawnDrop(x, y, type) { drops.push(new Drop(x, y, type)); }
 
+// ... (updateDrops, checkLevelUp, spawnEnemyGroup は変更なし)
 function updateDrops() {
     let pickupRangeMult = (player.activeMoveCard && player.activeMoveCard.id === "move_mag") ? 3.0 : 1.0;
     for(let e of equipment) if(e.id === "e_magnet") pickupRangeMult += 1.0;
@@ -166,16 +172,12 @@ function updateDrops() {
         let d = drops[i];
         d.update();
 
-        // --- 変更: ポーションおよびハートは時間経過(600f=10s)で消える ---
         if ((d.type === "POTION" || d.type === "HEART") && d.age > 600) {
             drops.splice(i, 1);
             continue;
         }
-        // ----------------------------------------------------------
 
-        // --- 変更: HP満タンならハートは吸い寄せず、拾わない ---
         if (d.type === "HEART" && player.hp >= player.maxHp) continue;
-        // -------------------------------------------------
 
         let distToP = dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y);
         if (distToP < (player.size + d.size) * pickupRangeMult) {
@@ -202,17 +204,14 @@ function updateDrops() {
                     addShake(5);
                     drops.splice(i, 1);
                 } else if (d.type === "HEART") {
-                    // --- 変更: HP回復処理 (既に上のcontinueでHP満タン時は弾いている) ---
                     player.heal(Math.ceil(player.maxHp * 0.10)); 
                     particles.push(new TextParticle(player.pos.x, player.pos.y, "♥", "#f00"));
                     drops.splice(i, 1);
-                    // --------------------------------------------------------
                 }
             }
         }
     }
 }
-
 function checkLevelUp() {
     enemiesToNextLevel--;
     if (enemiesToNextLevel <= 0) {
@@ -226,7 +225,6 @@ function checkLevelUp() {
         addShake(10);
     }
 }
-
 function spawnEnemyGroup() {
     if (random() < 0.02) { 
          let angle = random(TWO_PI);
@@ -291,12 +289,14 @@ function updateProjectiles(list, targets, isPlayerOwner) {
         let p = list[i];
         p.update();
         
+        // ... (エフェクト生成は変更なし)
         if(frameCount % 2 === 0) {
              if(p.card.id === "flame" || p.card.id === "flamethrower") particles.push(new AfterImage(p.pos.x + random(-3,3), p.pos.y + random(-3,3), random(5,10), p.color, 10));
              else if(!p.isOrbiter) particles.push(new Spark(p.pos.x, p.pos.y, p.color, p.vel.heading() + PI, random(1,3), 5));
         }
 
         if(!p.dead) {
+            // ... (Deflectの処理は変更なし)
             if(!isPlayerOwner && player.state === "MOVING" && player.activeMoveCard && player.activeMoveCard.id === "move_reflect") {
                 if(dist(p.pos.x, p.pos.y, player.pos.x, player.pos.y) < 40) {
                     particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCK", "#aaf"));
@@ -336,6 +336,15 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     if (isPlayerOwner) {
                          t.takeDamage(p.val, p.card);
                          
+                         // --- 追加: GUARDには貫通弾も消滅 ---
+                         if (t.type === "GUARD") {
+                             p.dead = true;
+                             createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#fff", 5);
+                             particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCKED", "#fff"));
+                             break;
+                         }
+                         // --------------------------------
+
                          if (p.card.id === "shooting_star" && p.bounceCount > 0) {
                              p.bounceCount--;
                              let nextTarget = null;
@@ -359,7 +368,11 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     else {
                          let dmg = p.val;
                          for(let e of equipment) if(e.id === "e_kevlar") dmg *= 0.7;
-                         t.takeDamage(dmg);
+                         // --- 変更: takeDamageに攻撃者(p)を渡す ---
+                         // 弾丸には発射元の情報がないため、弾自体を簡易attackerとして渡す
+                         t.takeDamage(dmg, {pos: p.pos}); 
+                         // -----------------------------------
+
                          if(p.card.tag === "PETRIFY") t.applyStatus("STUN", 60);
                          if(p.card.tag === "SLOW") t.applyStatus("SLOW", 120);
                          if(p.card.tag === "POISON") t.applyStatus("POISON", 300);
@@ -385,9 +398,8 @@ function updateProjectiles(list, targets, isPlayerOwner) {
         if (p.dead) list.splice(i, 1);
     }
 }
-
+// ... (以下の関数は変更なし)
 function distSq(v, w) { return (v.x - w.x)*(v.x - w.x) + (v.y - w.y)*(v.y - w.y); }
-
 function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
     let col = colOverride || "#f50";
     addShake(8);
@@ -407,7 +419,6 @@ function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
         }
     }
 }
-
 function createImpactSparks(x, y, angle, col, count) {
     for(let i=0; i<count; i++) {
         let spd = random(4, 10);
@@ -415,8 +426,6 @@ function createImpactSparks(x, y, angle, col, count) {
         particles.push(new Spark(x, y, col, angle + spread, spd, random(15, 25)));
     }
 }
-
-// --- INPUT & GAME FLOW ---
 function keyPressed() {
     if (gameState === "TITLE") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "SELECT_CLASS"; } 
     else if (gameState === "SELECT_CLASS") {
@@ -465,7 +474,6 @@ function keyPressed() {
     }
     else if (gameState === "GAME_OVER") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "TITLE"; }
 }
-
 function startGame() {
     if(playerClass === "WARRIOR") deck = [getCardById("slash"), getCardById("hammer"), getCardById("charge")];
     else if(playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("turret")];
@@ -483,7 +491,6 @@ function startGame() {
     player.refreshMoveCard();
     gameState = "PLAY";
 }
-
 function generateRewards(type) {
     rewardOptions = [];
     let pool;
@@ -529,7 +536,6 @@ function generateRewards(type) {
         rewardOptions.push(c);
     }
 }
-
 function confirmSelection() {
     let selection = rewardOptions[rewardIndex];
     let nextState = (player.sp > 0) ? "SKILL_TREE" : "PLAY"; 
@@ -565,7 +571,6 @@ function confirmSelection() {
         gameState = nextState; 
     }
 }
-
 function confirmDiscard() {
     if (gameState === "DISCARD_ACTION") { deck.splice(discardIndex, 1); deck.push(pendingCard); player.refreshMoveCard(); }
     else if (gameState === "DISCARD_EQUIP") { equipment.splice(discardIndex, 1); equipment.push(pendingCard); }
