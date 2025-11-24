@@ -67,7 +67,7 @@ function drawLibrary() {
     background(15);
     
     let bottomPanelH = 240;
-    let gridAreaH = height - bottomPanelH;
+    let panelY = height - bottomPanelH;
     
     textAlign(LEFT, TOP); fill(255); textSize(24); textStyle(BOLD);
     text("カード図鑑", 30, 20);
@@ -75,8 +75,6 @@ function drawLibrary() {
     fill(25); noStroke();
     rect(0, height - bottomPanelH, width, bottomPanelH);
     stroke(50); line(0, height - bottomPanelH, width, height - bottomPanelH);
-    
-    let panelY = height - bottomPanelH;
     
     let tabW = 120, tabH = 35;
     let tabs = ["ACTION", "MOVE", "EQUIP"];
@@ -307,7 +305,7 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
     
     let rarityColor = RARITY_COLORS[c.rarity] || "#888";
     if (c.type === "MOVE") rarityColor = "#0ff";
-    if (c.category === "EQUIP") rarityColor = "#ed0";
+    if (c.category === "EQUIP") rarityColor = "#fff"; 
 
     if (selected) { stroke(255, 255, 0); strokeWeight(2); drawingContext.shadowBlur = 10; drawingContext.shadowColor = "#ff0"; } 
     else stroke(rarityColor);
@@ -323,11 +321,11 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
          fill(255, 200, 50);
          textSize(8); textAlign(RIGHT, TOP);
          text(`Lv.${c.level}`, x+w-2, y+12);
-         textAlign(CENTER, CENTER);
     }
 
-    noStroke(); fill(c.color); textSize(16); textAlign(CENTER, CENTER); 
-    text(getIcon(c), x+w/2, y+h/2 - (showStats ? 15 : 0));
+    // --- 変更: 中央揃えを適用 ---
+    textAlign(CENTER, CENTER);
+    // -------------------------
     
     stroke(0); strokeWeight(2); fill(rarityColor); 
     textSize(9); text(c.name.substring(0,6), x+w/2, y+18);
@@ -354,45 +352,14 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
     if(showStats && c.currentCooldown > 0) { fill(0,0,0,150); noStroke(); let ch = h * (c.currentCooldown / c.cooldownMax); rect(x, y+h-ch, w, ch); }
 }
 
-function getIcon(c) {
-    if(c.category === "EQUIP") return "🛡️";
-    if(c.type === "MOVE") return "👟";
-    if(c.id==="assassin" || c.id==="gatotsu" || c.id==="counter") return "🗡️";
-    if(c.id==="boomerang" || c.id==="javelin") return "🪃";
-    if(c.id==="turret") return "🤖";
-    if(c.id==="orbit_fire") return "🔥";
-    if(c.id==="air_raid") return "✈️";
-    if(c.id==="life_drain") return "🩸";
-    if(c.tag==="HEAL") return "❤️";
-    if(c.id==="poison" || c.id==="alchemy") return "☠️";
-    if(c.id==="blizzard" || c.id==="shadow_bind") return "❄️";
-    if(c.id==="fireball" || c.id==="slow_sphere") return "☄️";
-    if(c.id==="giga_laser") return "🌠";
-    if(c.id==="thunder" || c.id==="stun_gun") return "⚡";
-    if(c.id==="vortex" || c.id==="gravity" || c.id==="black_hole") return "🌀";
-    if(c.id==="nova" || c.id==="cleave" || c.id==="repel") return "🌊";
-    if(c.id === "sniper") return "🎯";
-    if(c.id === "shotgun") return "🔫";
-    if(c.id === "m_gun") return "🔫";
-    if(c.id === "beam") return "🔦";
-    if(c.id === "fan_laser") return "📶";
-    if(c.id === "flamethrower") return "🔥";
-    if(c.id === "backstep" || c.id === "teleport") return "💨";
-    if(c.id === "ragnarok") return "🌋";
-    if(c.id === "barrage") return "🥊";
-    if(c.id === "cluster" || c.id === "cluster_bomb") return "💣";
-    if(c.id === "meteor") return "☄️";
-    if(c.id === "shooting_star") return "🌟";
-    if(c.id === "railgun") return "🚄";
-    if(c.id === "icicle") return "🧊";
-
-    if(c.system==="Magic") return "✨";
-    return "⚔️";
-}
-
 function drawSelectionScreen(title, subtitle) {
     fill(0,0,0,220); rect(0,0,width,height); textAlign(CENTER); fill(255); textSize(24); textStyle(BOLD); text(title, width/2, 80); textSize(16); fill(200); text(subtitle, width/2, 110);
-    let startX = 40; let cardW = 120; let gap = 20;
+    
+    let cardW = 120; 
+    let gap = 40; 
+    let totalW = CARD_CHOICES * cardW + (CARD_CHOICES - 1) * gap;
+    let startX = (width - totalW) / 2;
+
     for(let i=0; i<CARD_CHOICES; i++) {
         let c = rewardOptions[i]; let x = startX + i*(cardW+gap); let y = 150;
         let isHover = isMouseOver(x, y, cardW, 200);
@@ -403,6 +370,8 @@ function drawSelectionScreen(title, subtitle) {
         fill(c.category==="EQUIP"? color(30,25,15) : 20); rect(x,y,cardW,200,6); noStroke(); 
         
         let rarityCol = RARITY_COLORS[c.rarity] || "#fff";
+        if(c.category === "EQUIP") rarityCol = "#fff";
+        
         fill(c.color); textSize(16); text(c.name, x+cardW/2, y+25); 
         fill(rarityCol); textSize(10); text(c.rarity || c.category, x+cardW/2, y+45);
 
@@ -419,20 +388,20 @@ function drawSelectionScreen(title, subtitle) {
             let pwr = Math.floor(c.val * typeMult);
             text(`Power: ${pwr}`, x+cardW/2, y+115);
 
-            // --- 変更: 説明文の文字サイズと折り返し ---
-            fill(255); textAlign(CENTER, TOP); textSize(9);
+            fill(255); textAlign(CENTER, TOP); textSize(10); textLeading(14);
             text(c.desc, x+5, y+135, cardW-10, 80);
-            // ------------------------------------
-        } else { fill(255); textAlign(CENTER, TOP); textSize(9); text(c.desc, x+5, y+80, cardW-10, 120); } textAlign(CENTER);
+        } else { 
+            fill(255); textAlign(CENTER, TOP); textSize(10); textLeading(14);
+            text(c.desc, x+5, y+80, cardW-10, 120); 
+        } 
+        textAlign(CENTER);
     }
     
-    // --- 追加: スキップボタン ---
     let skipW = 160, skipH = 40;
     let skipX = width/2 - skipW/2;
     let skipY = 420;
     let hoverSkip = isMouseOver(skipX, skipY, skipW, skipH);
     drawButton(skipX, skipY, skipW, skipH, "選択をスキップ", hoverSkip, "#999");
-    // ---------------------------
 }
 
 function drawSkillTree() {
@@ -482,5 +451,11 @@ function drawDiscardScreen(title, list, type) {
 
 function drawGameOver() {
     fill(0,0,0,200); rect(0,0,width,height); textAlign(CENTER); fill(255,0,0); textSize(40); textStyle(BOLD); text("GAME OVER", width/2, height/2);
-    fill(255); textSize(20); text(`Score: ${score}`, width/2, height/2+40); text("[Z] タイトルへ戻る", width/2, height/2+80);
+    fill(255); textSize(20); text(`Score: ${score}`, width/2, height/2+40); 
+    
+    let btnW = 240, btnH = 50;
+    let btnX = width/2 - btnW/2;
+    let btnY = height/2 + 80;
+    let hoverBtn = isMouseOver(btnX, btnY, btnW, btnH);
+    drawButton(btnX, btnY, btnW, btnH, "タイトルへ戻る", hoverBtn, "#88f");
 }
