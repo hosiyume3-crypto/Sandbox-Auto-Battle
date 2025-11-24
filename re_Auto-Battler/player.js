@@ -62,8 +62,10 @@ class Player {
             }
             if(e.id === "e_battery" && type === "cdMult") val -= 0.10; 
             if(e.id === "e_titan") {
-                if(type === "melee" || type === "range" || type === "magic") val *= 1.20;
-                if(type === "cdMult") val += 0.20;
+                // --- 変更: タイタングローブ強化 ---
+                if(type === "melee" || type === "range" || type === "magic") val *= 1.50; 
+                if(type === "cdMult") val += 0.30; 
+                // ------------------------------
             }
         }
         if(type === "cdMult" && this.status.slow > 0) val += 0.10; 
@@ -235,6 +237,12 @@ class Player {
             
             this.timer--;
             if(this.currentCard) {
+                if (this.currentCard.id === "martial_arts" && this.timer % 5 === 0) this.performAction(true);
+                
+                // --- 追加: 槍撃乱舞 (連撃の強化版) ---
+                if (this.currentCard.id === "spear_flurry" && this.timer % 4 === 0 && this.timer > 0) this.performAction(true);
+                // ---------------------------------
+                
                 if ((this.currentCard.id === "multicut" || this.currentCard.id === "m_gun") && this.timer % 5 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "barrage" && this.timer % 15 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "flamethrower" && this.timer % 3 === 0 && this.timer > 0) this.performAction(true);
@@ -289,12 +297,20 @@ class Player {
         if (card.system === "Heal" || card.id === "teleport" || card.id === "turret" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
         
         let targetEnemy;
-        if (card.id === "assassin") targetEnemy = this.getFarthestEnemy();
+        if (card.id === "assassin" || card.id === "gatotsu") targetEnemy = this.getFarthestEnemy();
         else targetEnemy = this.getClosestEnemy();
 
         if (!targetEnemy) { 
             this.state = "IDLE";
             return; 
+        }
+        
+        if (card.id === "intercept") {
+            let distToTarget = dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y);
+            if (distToTarget > card.range) {
+                this.state = "IDLE"; 
+                return;
+            }
         }
 
         this.target = targetEnemy;
@@ -307,7 +323,7 @@ class Player {
             return;
         }
 
-        let effectiveRange = (card.id === "assassin" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "life_drain") ? 9999 : card.range;
+        let effectiveRange = (card.id === "assassin" || card.id === "gatotsu" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "life_drain" || card.id === "air_raid" || card.id === "gear" || card.id === "super_ball") ? 9999 : card.range;
         if(card.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
         
         if (dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y) <= effectiveRange) {
@@ -376,7 +392,7 @@ class Player {
         }
         
         if (this.state !== "LOOTING" && this.currentCard) {
-             let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere" || this.currentCard.id === "life_drain") ? 9999 : this.currentCard.range;
+             let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "gatotsu" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere" || this.currentCard.id === "life_drain") ? 9999 : this.currentCard.range;
              if(this.currentCard.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
              
              if (dist(this.pos.x, this.pos.y, this.target.pos.x, this.target.pos.y) <= effectiveRange) {
@@ -402,15 +418,10 @@ class Player {
         let variance = random(0.8, 1.2); 
         let finalVal = Math.floor(baseVal * variance);
         
-        // --- 変更: カード名ポップアップをUI位置に表示 ---
         if(!isMultiHit) {
-            // プレイヤー頭上ではなく、UI上のカード位置に表示
-            // ACTIONカードの場合
             if (c.type === "MOVE") {
-                // MOVEMENT枠
                 uiParticles.push(new UIParticle(130 + 25, height - UI_HEIGHT + 35 - 20, c.name, c.color, 60));
             } else {
-                // ACTION DECK枠
                 let actionDeck = deck.filter(x => x.category === "ACTION");
                 let idx = actionDeck.indexOf(c);
                 if (idx !== -1) {
@@ -419,7 +430,6 @@ class Player {
                 }
             }
         }
-        // -------------------------------------------
         
         if (c.id === "counter") {
             this.counterTimer = c.duration; 
@@ -515,6 +525,11 @@ class Player {
         else if (c.style === "AOE") {
             particles.push(new Shockwave(this.pos.x, this.pos.y, c.range, c.color));
             if(c.id === "cleave" || c.id === "vortex" || c.id === "repel" || c.id === "shadow_bind" || c.id === "alchemy") particles.push(new SlashEffect(this.pos.x, this.pos.y, c.color, c.range, true));
+            
+            if (c.id === "roar") { 
+                particles.push(new Shockwave(this.pos.x, this.pos.y, c.range * 1.5, "#fff")); 
+            }
+
             addShake(4);
             
             for(let e of enemies) {
@@ -541,6 +556,7 @@ class Player {
                         if(c.id === "gravity" || c.id === "vortex") pushForce = -30; 
                         if(c.id === "stomp") pushForce = 70;
                         if(c.id === "hammer") pushForce = 120; 
+                        if(c.id === "roar") pushForce = 180;
                         
                         let push = p5.Vector.sub(e.pos, this.pos).setMag(pushForce);
                         if(c.id === "gravity" || c.id === "vortex") push = p5.Vector.sub(this.pos, e.pos).setMag(pushForce * -1);
@@ -576,8 +592,13 @@ class Player {
                 
                 if (c.id === "hammer") {
                     particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 100, c.color));
-                } else if (c.id === "spear") {
+                } else if (c.id === "spear" || c.id === "spear_flurry") {
                     particles.push(new StabEffect(this.pos.x, this.pos.y, angle, c.color, 120));
+                } else if (c.id === "pile_bunker") {
+                    particles.push(new StabEffect(this.pos.x, this.pos.y, angle, c.color, 180));
+                    particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 60, c.color));
+                } else if (c.id === "martial_arts") {
+                    particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 40, false, angle));
                 } else {
                     particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 70, false, angle));
                 }
@@ -599,9 +620,10 @@ class Player {
                          if (c.id === "charge") kb = 80;
                          if (c.id === "multicut") kb = 25; 
                          if (c.id === "barrage") kb = 10;
-                         // --- 変更: スピアのノックバック強化 ---
                          if (c.id === "spear") kb = 100; 
-                         // ----------------------------------
+                         if (c.id === "pile_bunker") kb = 200;
+                         if (c.id === "martial_arts") kb = 5;
+                         if (c.id === "spear_flurry") kb = 60;
                          
                          let push = p5.Vector.sub(e.pos, this.pos).setMag(kb);
                          e.pos.add(push);
@@ -669,7 +691,35 @@ class Player {
                 } else if (c.id === "shooting_star") {
                      let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 5); 
                      projectiles.push(p);
-                } else {
+                } 
+                else if (c.id === "gear") {
+                    let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 12);
+                    projectiles.push(p);
+                }
+                // --- 追加: スーパーボール (6方向) ---
+                else if (c.id === "super_ball") {
+                    for (let i = 0; i < 6; i++) {
+                        let spreadDir = dir.copy().rotate(i * (TWO_PI / 6));
+                        let p = new Projectile(this.pos.x, this.pos.y, spreadDir, c, finalVal, 15);
+                        projectiles.push(p);
+                    }
+                }
+                // ---------------------------------
+                else if (c.id === "homing_missile") {
+                    for(let i=0; i<4; i++) {
+                        let randTarget = enemies.length > 0 ? random(enemies) : null;
+                        let spreadDir = dir.copy().rotate(map(i, 0, 3, -0.5, 0.5));
+                        let p = new Projectile(this.pos.x, this.pos.y, spreadDir, c, finalVal, 8);
+                        p.target = randTarget;
+                        projectiles.push(p);
+                    }
+                }
+                else if (c.id === "intercept") {
+                    let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 25);
+                    p.life = 15; 
+                    projectiles.push(p);
+                }
+                else {
                     let pSpeed = (c.id === "flame") ? 8 : 15;
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, pSpeed);
                     if(c.id === "boomerang" || c.id === "javelin") { p.piercing = true; }
@@ -681,7 +731,8 @@ class Player {
     }
 
     nextCardIndex() { this.deckIndex = (this.deckIndex + 1) % deck.length; this.state = "IDLE"; }
-
+    
+    // takeDamage, heal, getClosestEnemy, getFarthestEnemy, getClosestDrop, draw は変更なし
     takeDamage(amt, attacker) { 
         if (this.state === "LOOTING") {
             this.state = "IDLE";
@@ -720,6 +771,13 @@ class Player {
         }
         for(let e of equipment) if(e.id === "e_ghost" && random() < 0.15) {
              particles.push(new TextParticle(this.pos.x, this.pos.y-10, "MISS", "#ccc")); return;
+        }
+
+        if(this.activeMoveCard && this.activeMoveCard.id === "move_reflect" && this.state === "MOVING") {
+            if (attacker && !(attacker instanceof Enemy)) {
+                amt = Math.floor(amt * 0.5);
+                particles.push(new TextParticle(this.pos.x, this.pos.y-20, "REFLECT", "#0dd"));
+            }
         }
 
         if(this.barrierStock > 0) {
@@ -768,7 +826,8 @@ class Player {
 
     getClosestDrop() {
         let nearest = this.getClosestEnemy();
-        if (this.invincibleTimer > 0 || (nearest && dist(this.pos.x, this.pos.y, nearest.pos.x, nearest.pos.y) < 200)) {
+        let hasMagnet = equipment.some(e => e.id === "e_magnet");
+        if (!hasMagnet && (this.invincibleTimer > 0 || (nearest && dist(this.pos.x, this.pos.y, nearest.pos.x, nearest.pos.y) < 200))) {
             return null;
         }
 
