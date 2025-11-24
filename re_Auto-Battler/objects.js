@@ -106,13 +106,20 @@ class Projectile {
         this.pos = createVector(x, y); this.vel = dirVec.copy().setMag(speed);
         this.card = card; this.val = val; this.color = card.color || "#fff";
         this.dead = false; this.life = (card.id === "flame" || card.id === "flamethrower") ? 20 : 60; 
-        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun" || card.id === "icicle");
+        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun" || card.id === "icicle" || card.id === "javelin" || card.id === "gear" || card.id === "super_ball");
         this.isOrbiter = false; this.orbitAngle = 0; this.orbitRadius = 0;
         
         this.bounceCount = card.bounce || 0;
+        if (card.id === "gear") this.bounceCount = 5; 
+        // --- 追加: スーパーボールの跳弾回数 ---
+        if (card.id === "super_ball") this.bounceCount = 20; 
+        // -----------------------------------
 
         if(card.id === "slow_sphere") this.life = 180; 
         if(card.id === "railgun") this.life = 10; 
+        if(card.id === "gear") this.life = 180;
+        if(card.id === "super_ball") this.life = 300; 
+        if(card.id === "homing_missile") { this.life = 120; this.homing = true; this.target = null; }
 
         this.isBoomerang = (card.id === "boomerang");
         this.returnTimer = 0; 
@@ -140,7 +147,36 @@ class Projectile {
             }
             this.life--; if(this.life<=0) this.dead=true;
         } else {
-            this.pos.add(this.vel); this.vel.mult(this.drag); this.life--; 
+            this.pos.add(this.vel); 
+            this.vel.mult(this.drag); 
+            
+            if (this.homing && this.target && !this.target.dead) {
+                let desired = p5.Vector.sub(this.target.pos, this.pos).setMag(this.vel.mag());
+                this.vel.lerp(desired, 0.1);
+            }
+
+            // --- 変更: ギアとスーパーボールの画面反射 ---
+            if (this.card.id === "gear" || this.card.id === "super_ball") {
+                let left = camX;
+                let right = camX + width;
+                let top = camY;
+                let bottom = camY + height; 
+
+                let bounced = false;
+                if (this.pos.x < left) { this.pos.x = left; this.vel.x *= -1; bounced = true; }
+                if (this.pos.x > right) { this.pos.x = right; this.vel.x *= -1; bounced = true; }
+                if (this.pos.y < top) { this.pos.y = top; this.vel.y *= -1; bounced = true; }
+                if (this.pos.y > bottom) { this.pos.y = bottom; this.vel.y *= -1; bounced = true; }
+
+                if (bounced) {
+                    this.bounceCount--;
+                    particles.push(new Spark(this.pos.x, this.pos.y, "#aaa", 0, 0, 10));
+                    if (this.bounceCount < 0) this.dead = true;
+                }
+            }
+            // ---------------------------------------
+
+            this.life--; 
             if(this.life<0 || this.pos.x<0 || this.pos.x>WORLD_W || this.pos.y<0 || this.pos.y>WORLD_H) this.dead=true; 
         }
     }
@@ -151,7 +187,7 @@ class Projectile {
         fill(this.color); noStroke(); 
         translate(this.pos.x, this.pos.y);
         
-        if(this.card.id === "beam" || this.card.id === "sniper") { 
+        if(this.card.id === "beam" || this.card.id === "sniper" || this.card.id === "intercept") { 
             rotate(this.vel.heading()); 
             rect(-15, -3, 30, 6); 
             fill(255); rect(-10,-1, 20,2); 
@@ -166,11 +202,9 @@ class Projectile {
             fill(255); rect(-25, -8, 50, 16); 
         }
         else if(this.card.id === "railgun") {
-            // --- 変更: レールガン描画 ---
             rotate(this.vel.heading());
-            fill(100, 200, 255); rect(-40, -4, 1200, 8); // Very long visual
+            fill(100, 200, 255); rect(-40, -4, 1200, 8); 
             fill(255); rect(-30, -2, 1200, 4);
-            // -------------------------
         }
         else if(this.card.id === "slow_sphere") {
              circle(0,0,30); 
@@ -179,6 +213,32 @@ class Projectile {
              rotate(this.vel.heading());
              fill(200, 255, 255);
              triangle(10, 0, -10, 4, -10, -4);
+        }
+        else if(this.card.id === "javelin") {
+            rotate(this.vel.heading());
+            stroke(255, 100); strokeWeight(1); line(-40, 0, 0, 0); noStroke();
+            fill(139, 69, 19); rect(-15, -2, 30, 4);
+            fill(200, 200, 200); triangle(15, -4, 35, 0, 15, 4);
+            fill(255); rect(-10, -1, 20, 2);
+        }
+        else if (this.card.id === "gear") {
+            rotate(frameCount * 0.2);
+            fill(150); circle(0, 0, 20);
+            fill(200); for(let i=0; i<8; i++) { rotate(PI/4); rect(8, -3, 6, 6); }
+            fill(50); circle(0,0,8);
+        }
+        // --- 追加: スーパーボールの描画 ---
+        else if (this.card.id === "super_ball") {
+            fill(random(255), random(255), 255); 
+            circle(0, 0, 18);
+            fill(255, 200); circle(4, -4, 6);
+        }
+        // ------------------------------
+        else if (this.card.id === "homing_missile") {
+            rotate(this.vel.heading());
+            fill(200, 100, 50); rect(-10, -4, 20, 8);
+            fill(255, 0, 0); triangle(10, -4, 15, 0, 10, 4);
+            fill(255, 200, 0, 150); triangle(-10, -3, -10, 3, -10 - random(5,10), 0);
         }
         else if(this.isBoomerang) { 
             rotate(frameCount * 0.5); 
