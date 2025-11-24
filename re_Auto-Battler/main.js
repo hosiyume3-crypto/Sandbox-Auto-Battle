@@ -1,20 +1,31 @@
 /* Sandbox Auto-Battler V35 - Main Loop & Game Logic */
 
-// ... (setup, draw等は変更なし)
+// --- ASSETS & DATA ---
 function setup() {
     createCanvas(VIEW_W, VIEW_H + UI_HEIGHT);
     frameRate(60);
+    textFont("Noto Sans JP");
     initLibraries();
     camX = WORLD_W/2 - width/2;
     camY = WORLD_H/2 - height/2;
 }
 
 let totalKills = 0;
+let spProgress = 0;
+let killsForNextSp = 10;
 
+// --- グローバルステート管理 ---
+let libraryTab = "ACTION"; 
+let libraryActionFilter = "ALL"; 
+let isPaused = false;
+let uiParticles = []; // 追加: UI用パーティクル配列
+
+// --- MAIN LOOP ---
 function draw() {
     background(10);
+    updateMouseHover();
     
-    if (player) {
+    if (player && gameState === "PLAY" && !isPaused) {
         let targetX = player.pos.x - width/2;
         let targetY = player.pos.y - (height - UI_HEIGHT)/2;
         camX = lerp(camX, targetX, 0.08);
@@ -26,47 +37,245 @@ function draw() {
             shakePower *= 0.9;
             if(shakePower < 0.5) shakePower = 0;
         }
-        // camX = constrain(camX, 0, WORLD_W - width);
-        // camY = constrain(camY, 0, WORLD_H - (height - UI_HEIGHT));
     }
 
-    push();
-    translate(-camX, -camY);
-    
-    drawGrid();
-    
-    if (gameState !== "TITLE" && gameState !== "SELECT_CLASS") {
-        if (gameState === "PLAY") updateGame();
-        drawGame();
+    if (gameState === "LIBRARY" || gameState === "TITLE") {
+    } else {
+        push();
+        translate(-camX, -camY);
+        drawGrid();
+        if (gameState === "PLAY" || gameState === "PAUSE" || gameState.includes("SELECT") || gameState === "GAME_OVER" || gameState === "SKILL_TREE" || gameState.includes("DISCARD")) {
+            if (gameState === "PLAY" && !isPaused) updateGame();
+            drawGame();
+        }
+        pop();
     }
-    pop();
 
     if(screenFlash > 0) {
         noStroke(); fill(255, screenFlash); rect(0, 0, width, height - UI_HEIGHT);
         screenFlash *= 0.8; if(screenFlash < 5) screenFlash = 0;
     }
 
-    fill(20); noStroke(); rect(0, height - UI_HEIGHT, width, UI_HEIGHT);
-    stroke(50); line(0, height - UI_HEIGHT, width, height - UI_HEIGHT); noStroke();
-
-    if (gameState === "TITLE") drawTitle();
-    else if (gameState === "SELECT_CLASS") drawClassSelect();
-    else {
+    // UI描画
+    if (gameState === "TITLE") {
+        drawTitle();
+    } else if (gameState === "LIBRARY") {
+        drawLibrary();
+    } else if (gameState === "SELECT_CLASS") {
+        drawClassSelect();
+    } else {
+        fill(20); noStroke(); rect(0, height - UI_HEIGHT, width, UI_HEIGHT);
+        stroke(50); line(0, height - UI_HEIGHT, width, height - UI_HEIGHT); noStroke();
         drawUI();
-        if (gameState === "LEVEL_UP") drawSelectionScreen("LEVEL UP!", "CHOOSE REWARD");
+        
+        // --- 追加: UIパーティクルの描画 ---
+        for(let i = uiParticles.length - 1; i >= 0; i--) {
+            uiParticles[i].update();
+            uiParticles[i].draw();
+            if(uiParticles[i].dead) uiParticles.splice(i, 1);
+        }
+        // -------------------------------
+
+        if (gameState === "PLAY" && isPaused) {
+            drawPauseMenu();
+        }
+        else if (gameState === "LEVEL_UP") drawSelectionScreen("LEVEL UP!", "報酬を選択してください");
         else if (gameState === "SKILL_TREE") drawSkillTree();
-        else if (gameState === "EQUIP_SELECT") drawSelectionScreen("RARE DROP!", "CHOOSE EQUIPMENT");
-        else if (gameState === "DISCARD_ACTION") drawDiscardScreen("DECK FULL", deck, "ACTION");
-        else if (gameState === "DISCARD_EQUIP") drawDiscardScreen("INVENTORY FULL", equipment, "EQUIP");
+        else if (gameState === "EQUIP_SELECT") drawSelectionScreen("RARE DROP!", "装備を選択してください");
+        else if (gameState === "DISCARD_ACTION") drawDiscardScreen("デッキが一杯です", deck, "ACTION");
+        else if (gameState === "DISCARD_EQUIP") drawDiscardScreen("装備が一杯です", equipment, "EQUIP");
         else if (gameState === "GAME_OVER") drawGameOver();
     }
 }
+
 function addShake(amount) { shakePower = min(shakePower + amount, 25); }
 function triggerFlash(amount) { screenFlash = min(screenFlash + amount, 150); }
 
-// --- LOGIC ---
+// --- マウスホバー状態の更新 ---
+function updateMouseHover() {
+    if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
+        let startX = 40; let cardW = 120; let gap = 20;
+        for(let i=0; i<CARD_CHOICES; i++) {
+            let x = startX + i*(cardW+gap); let y = 150;
+            if (isMouseOver(x, y, cardW, 200)) {
+                rewardIndex = i; 
+            }
+        }
+    } else if (gameState === "SKILL_TREE") {
+        let startX = 150; let gapX = 250; 
+        let startY = 180; let gapY = 150;
+        for(let i=0; i<6; i++) {
+            let r = floor(i/3); let c = i%3;
+            let x = startX + c*gapX; let y = startY + r*gapY;
+            if (isMouseOver(x-80, y-50, 160, 100)) {
+                skillIndex = i;
+            }
+        }
+    } else if (gameState.includes("DISCARD")) {
+        let list = (gameState === "DISCARD_ACTION") ? deck : equipment;
+        let w=50; let gap=10; let totalW = list.length*(w+gap); let sx = (width-totalW)/2;
+        for(let i=0; i<list.length; i++) { 
+            let x = sx + i*(w+gap); let y=200;
+            if (isMouseOver(x, y, w, w*1.8)) {
+                discardIndex = i;
+            }
+        }
+    }
+}
+
+// --- マウス入力処理 ---
+function mousePressed() {
+    if (gameState === "TITLE") {
+        let btnW = 240, btnH = 50;
+        let startX = width/2 - btnW/2;
+        let startY = height/2 + 20;
+        let libY = height/2 + 90;
+        
+        if (isMouseOver(startX, startY, btnW, btnH)) {
+            gameState = "SELECT_CLASS";
+        }
+        else if (isMouseOver(startX, libY, btnW, btnH)) {
+            gameState = "LIBRARY";
+        }
+    } 
+    else if (gameState === "LIBRARY") {
+        let panelY = height - 240;
+        let tabW = 120, tabH = 35;
+        let tabs = ["ACTION", "MOVE", "EQUIP"];
+        let tabSX = 30;
+        let tabSY = panelY + 15;
+        for(let i=0; i<tabs.length; i++) {
+            let x = tabSX + i*(tabW+10);
+            if(isMouseOver(x, tabSY, tabW, tabH)) {
+                libraryTab = tabs[i];
+                return;
+            }
+        }
+        
+        if (libraryTab === "ACTION") {
+            let filters = ["ALL", "MELEE", "RANGED", "MAGIC"];
+            let filterW = 80, filterH = 25;
+            let filterSX = width - (filters.length * (filterW + 10)) - 30;
+            let filterSY = panelY + 20;
+            for(let i=0; i<filters.length; i++) {
+                let x = filterSX + i*(filterW+10);
+                if (isMouseOver(x, filterSY, filterW, filterH)) {
+                    libraryActionFilter = filters[i];
+                    return;
+                }
+            }
+        }
+        
+        let backW = 120, backH = 50;
+        let backX = width - backW - 30;
+        let backY = height - 70;
+        if(isMouseOver(backX, backY, backW, backH)) {
+            gameState = "TITLE";
+        }
+    }
+    else if (gameState === "SELECT_CLASS") {
+        let w = 140; let gap = 20; let sx = (width - (4*w + 3*gap))/2;
+        for(let i=0; i<4; i++) {
+            let x = sx + i*(w+gap); let y = 150;
+            if (isMouseOver(x, y, w, 200)) {
+                classIndex = i;
+                playerClass = CLASSES[classIndex];
+                startGame();
+                return;
+            }
+        }
+        let backW = 120, backH = 40;
+        let backX = width/2 - backW/2;
+        let backY = 450;
+        if(isMouseOver(backX, backY, backW, backH)) {
+            gameState = "TITLE";
+        }
+    }
+    else if (gameState === "PLAY") {
+        let menuBtnSize = 40;
+        let menuBtnX = width - 50;
+        let menuBtnY = 70; 
+        if (isMouseOver(menuBtnX, menuBtnY, menuBtnSize, menuBtnSize)) {
+            isPaused = !isPaused;
+        }
+        
+        if (isPaused) {
+            let menuH = 250;
+            let menuY = height/2 - menuH/2;
+            let btnW = 200, btnH = 50;
+            let btnX = width/2 - btnW/2;
+            
+            if (isMouseOver(btnX, menuY + 90, btnW, btnH)) {
+                isPaused = false;
+            }
+            else if (isMouseOver(btnX, menuY + 160, btnW, btnH)) {
+                isPaused = false;
+                gameState = "TITLE";
+            }
+        }
+    }
+    else if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
+        let startX = 40; let cardW = 120; let gap = 20;
+        for(let i=0; i<CARD_CHOICES; i++) {
+            let x = startX + i*(cardW+gap); let y = 150;
+            if (isMouseOver(x, y, cardW, 200)) {
+                rewardIndex = i;
+                confirmSelection();
+                return;
+            }
+        }
+        
+        // --- 追加: スキップボタン判定 ---
+        let skipW = 160, skipH = 40;
+        let skipX = width/2 - skipW/2;
+        let skipY = 420;
+        if (isMouseOver(skipX, skipY, skipW, skipH)) {
+            gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
+            particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKIPPED", "#999"));
+        }
+        // ------------------------------
+    }
+    else if (gameState === "SKILL_TREE") {
+        let startX = 150; let gapX = 250; 
+        let startY = 180; let gapY = 150;
+        let r = floor(skillIndex/3); let c = skillIndex%3;
+        let x = startX + c*gapX; let y = startY + r*gapY;
+        
+        if (isMouseOver(x-80, y-50, 160, 100)) {
+             if(player.sp > 0) {
+                 player.sp--;
+                 if(skillIndex === 0) player.upgrades.hp++;
+                 if(skillIndex === 1) player.upgrades.atk++;
+                 if(skillIndex === 2) player.upgrades.spd++;
+                 if(skillIndex === 3) player.upgrades.range++;
+                 if(skillIndex === 4) player.upgrades.luck++;
+                 if(skillIndex === 5) player.upgrades.def++;
+
+                 player.maxHp = 200 + player.upgrades.hp * 50 + player.getStat("hpAdd");
+                 player.hp = min(player.hp + 50, player.maxHp);
+                 particles.push(new TextParticle(width/2, height/2, "UPGRADE!", "#ff0"));
+                 createImpactSparks(width/2, height/2, -HALF_PI, "#ff0", 20);
+             }
+             gameState = "PLAY";
+        }
+    }
+    else if (gameState.includes("DISCARD")) {
+        let list = (gameState === "DISCARD_ACTION") ? deck : equipment;
+        let w=50; let gap=10; let totalW = list.length*(w+gap); let sx = (width-totalW)/2;
+        for(let i=0; i<list.length; i++) { 
+            let x = sx + i*(w+gap); let y=200;
+            if (isMouseOver(x, y, w, w*1.8)) {
+                discardIndex = i;
+                confirmDiscard();
+                return;
+            }
+        }
+    }
+}
+
+// ... (updateGame, updateDeployables, updatePuddles, updateEnemies, spawnDrop, updateDrops, checkLevelUp, spawnEnemyGroup, updateProjectiles, distSq, createExplosion, createImpactSparks は変更なし)
+// (省略します。元のコードをそのまま使用してください)
 function updateGame() {
-    // ... (変更なし)
     const scaleFactor = Math.floor((wave - 1) / 5);
     let baseSpawnRate = 360; 
     let rateDecrease = Math.min(180, wave * 10 + scaleFactor * 30); 
@@ -89,7 +298,6 @@ function updateGame() {
     }
 }
 
-// ... (updateDeployables, updatePuddles は変更なし)
 function updateDeployables() {
     for (let i = deployables.length - 1; i >= 0; i--) {
         deployables[i].update();
@@ -116,17 +324,13 @@ function updateEnemies() {
         e.update();
         if (e.dead) {
             totalKills++;
-            if (totalKills % 10 === 0) {
+            spProgress++;
+            if (spProgress >= killsForNextSp) {
                 player.sp++;
                 gameState = "SKILL_TREE";
+                spProgress = 0;
+                killsForNextSp = min(15, killsForNextSp + 1); 
             }
-
-            // --- 追加: 錬金術によるドロップ ---
-            if (e.isAlchemized && random() < 0.6) { // 60%でポーション
-                spawnDrop(e.pos.x, e.pos.y, "POTION");
-                particles.push(new TextParticle(e.pos.x, e.pos.y, "TRANSMUTED!", "#ff0"));
-            }
-            // -----------------------------
 
             if (e.type === "MERCHANT") {
                 particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
@@ -163,7 +367,6 @@ function updateEnemies() {
 
 function spawnDrop(x, y, type) { drops.push(new Drop(x, y, type)); }
 
-// ... (updateDrops, checkLevelUp, spawnEnemyGroup は変更なし)
 function updateDrops() {
     let pickupRangeMult = (player.activeMoveCard && player.activeMoveCard.id === "move_mag") ? 3.0 : 1.0;
     for(let e of equipment) if(e.id === "e_magnet") pickupRangeMult += 1.0;
@@ -212,6 +415,7 @@ function updateDrops() {
         }
     }
 }
+
 function checkLevelUp() {
     enemiesToNextLevel--;
     if (enemiesToNextLevel <= 0) {
@@ -225,6 +429,7 @@ function checkLevelUp() {
         addShake(10);
     }
 }
+
 function spawnEnemyGroup() {
     if (random() < 0.02) { 
          let angle = random(TWO_PI);
@@ -289,14 +494,12 @@ function updateProjectiles(list, targets, isPlayerOwner) {
         let p = list[i];
         p.update();
         
-        // ... (エフェクト生成は変更なし)
         if(frameCount % 2 === 0) {
              if(p.card.id === "flame" || p.card.id === "flamethrower") particles.push(new AfterImage(p.pos.x + random(-3,3), p.pos.y + random(-3,3), random(5,10), p.color, 10));
              else if(!p.isOrbiter) particles.push(new Spark(p.pos.x, p.pos.y, p.color, p.vel.heading() + PI, random(1,3), 5));
         }
 
         if(!p.dead) {
-            // ... (Deflectの処理は変更なし)
             if(!isPlayerOwner && player.state === "MOVING" && player.activeMoveCard && player.activeMoveCard.id === "move_reflect") {
                 if(dist(p.pos.x, p.pos.y, player.pos.x, player.pos.y) < 40) {
                     particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCK", "#aaf"));
@@ -336,14 +539,12 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     if (isPlayerOwner) {
                          t.takeDamage(p.val, p.card);
                          
-                         // --- 追加: GUARDには貫通弾も消滅 ---
                          if (t.type === "GUARD") {
                              p.dead = true;
                              createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#fff", 5);
                              particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCKED", "#fff"));
                              break;
                          }
-                         // --------------------------------
 
                          if (p.card.id === "shooting_star" && p.bounceCount > 0) {
                              p.bounceCount--;
@@ -368,10 +569,7 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     else {
                          let dmg = p.val;
                          for(let e of equipment) if(e.id === "e_kevlar") dmg *= 0.7;
-                         // --- 変更: takeDamageに攻撃者(p)を渡す ---
-                         // 弾丸には発射元の情報がないため、弾自体を簡易attackerとして渡す
                          t.takeDamage(dmg, {pos: p.pos}); 
-                         // -----------------------------------
 
                          if(p.card.tag === "PETRIFY") t.applyStatus("STUN", 60);
                          if(p.card.tag === "SLOW") t.applyStatus("SLOW", 120);
@@ -398,7 +596,7 @@ function updateProjectiles(list, targets, isPlayerOwner) {
         if (p.dead) list.splice(i, 1);
     }
 }
-// ... (以下の関数は変更なし)
+
 function distSq(v, w) { return (v.x - w.x)*(v.x - w.x) + (v.y - w.y)*(v.y - w.y); }
 function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
     let col = colOverride || "#f50";
@@ -426,12 +624,20 @@ function createImpactSparks(x, y, angle, col, count) {
         particles.push(new Spark(x, y, col, angle + spread, spd, random(15, 25)));
     }
 }
+
 function keyPressed() {
-    if (gameState === "TITLE") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "SELECT_CLASS"; } 
+    if (gameState === "TITLE") { 
+        if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "SELECT_CLASS"; 
+    } 
     else if (gameState === "SELECT_CLASS") {
         if (keyCode === LEFT_ARROW) classIndex = (classIndex - 1 + 4) % 4;
         if (keyCode === RIGHT_ARROW) classIndex = (classIndex + 1) % 4;
         if (key === 'Enter' || key === 'z' || key === 'Z') { playerClass = CLASSES[classIndex]; startGame(); }
+    }
+    else if (gameState === "PLAY") {
+        if (key === 'Escape') {
+            isPaused = !isPaused;
+        }
     }
     else if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
         if (keyCode === LEFT_ARROW) rewardIndex = (rewardIndex - 1 + CARD_CHOICES) % CARD_CHOICES;
@@ -473,7 +679,9 @@ function keyPressed() {
         if (key === 'Enter' || key === 'z' || key === 'Z') confirmDiscard();
     }
     else if (gameState === "GAME_OVER") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "TITLE"; }
+    else if (gameState === "LIBRARY") { if (key === 'x' || key === 'X' || key === 'Escape') gameState = "TITLE"; }
 }
+
 function startGame() {
     if(playerClass === "WARRIOR") deck = [getCardById("slash"), getCardById("hammer"), getCardById("charge")];
     else if(playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("turret")];
@@ -485,12 +693,17 @@ function startGame() {
     enemies = []; drops = []; projectiles = []; enemyProjectiles = []; particles = []; deployables = []; puddles = [];
     score = 0; wave = 1; enemiesToNextLevel = 5;
     totalKills = 0; 
+    spProgress = 0;
+    killsForNextSp = 10;
+    isPaused = false;
+    
     player.pos = createVector(WORLD_W/2, WORLD_H/2);
     camX = WORLD_W/2 - width/2;
     camY = WORLD_H/2 - height/2;
     player.refreshMoveCard();
     gameState = "PLAY";
 }
+
 function generateRewards(type) {
     rewardOptions = [];
     let pool;
@@ -536,6 +749,7 @@ function generateRewards(type) {
         rewardOptions.push(c);
     }
 }
+
 function confirmSelection() {
     let selection = rewardOptions[rewardIndex];
     let nextState = (player.sp > 0) ? "SKILL_TREE" : "PLAY"; 
@@ -571,6 +785,7 @@ function confirmSelection() {
         gameState = nextState; 
     }
 }
+
 function confirmDiscard() {
     if (gameState === "DISCARD_ACTION") { deck.splice(discardIndex, 1); deck.push(pendingCard); player.refreshMoveCard(); }
     else if (gameState === "DISCARD_EQUIP") { equipment.splice(discardIndex, 1); equipment.push(pendingCard); }
