@@ -35,7 +35,7 @@ function initLibraries() {
         // --- 新規追加: 錬金術 (魔法) ---
         A("alchemy", "Alchemy", "Magic", "AOE", "DEBUFF", 200, 15, 40, 480, "RARE", "Toxic mist. Victims drop potions."),
 
-        A("boomerang", "Boomerang", "Ranged", "RANGE", "PROJECTILE", 150, 20, 30, 180, "RARE", "Throws a piercing weapon that returns."),
+        A("boomerang", "Boomerang", "Ranged", "RANGE", "PROJECTILE", 250, 20, 30, 180, "RARE", "Throws a piercing weapon that returns."),
         A("air_raid", "Air Raid", "Ranged", "AOE", "ATK", 999, 56, 60, 900, "LEGENDARY", "Bombards random enemies from above."), 
         
         A("life_drain", "Life Drain", "Magic", "RANGE", "DEBUFF", 100, 0, 20, 600, "RARE", "Steals 25% of the target's Max HP."),
@@ -47,7 +47,7 @@ function initLibraries() {
 
         A("fan_laser", "FanLaser", "Magic", "RANGE", "PROJECTILE", 400, 17, 60, 360, "LEGENDARY", "Rapidly fires 8 lasers in a wide fan shape."),
         A("flamethrower", "Flamer", "Magic", "RANGE", "PROJECTILE", 180, 4, 90, 360, "RARE", "Emits a continuous stream of fire."),
-        A("backstep", "Backstep", "Ranged", "RANGE", "PROJECTILE", 80, 14, 20, 180, "COMMON", "Shoots and quickly retreats backwards."),
+        A("backstep", "Backstep", "Ranged", "RANGE", "PROJECTILE", 200, 14, 20, 180, "COMMON", "Shoots and quickly retreats backwards."),
 
         A("giga_laser", "GigaLaser", "Magic", "RANGE", "PROJECTILE", 400, 40, 60, 500, "RARE", "Fires a massive, piercing wide laser."),
         A("orbit_fire", "Orbiter", "Magic", "SELF", "BUFF", 150, 14, 0, 600, "RARE", "Summons 4 fireballs that circle you for 5s."),
@@ -84,7 +84,7 @@ function initLibraries() {
         A("teleport", "Blink", "Magic", "SELF", "BUFF", 0, 0, 1, 180, "RARE", "Instantly move a short distance forward."), 
         A("meteor", "Meteor", "Magic", "AOE", "EXPLOSION", 0, 40, 60, 300, "RARE", "Drops a meteor on a random enemy."),
 
-        A("bow", "Bow", "Ranged", "RANGE", "ATK", 250, 14, 30, 80, "COMMON", "Basic long-range arrow shot."), 
+        A("bow", "Bow", "Ranged", "RANGE", "ATK", 300, 14, 30, 80, "COMMON", "Basic long-range arrow shot."), 
         A("m_gun", "M.Gun", "Ranged", "RANGE", "ATK", 150, 5, 5, 12, "COMMON", "Low power, rapid-fire, low range."),
         
         A("flame", "Flame", "Magic", "RANGE", "PROJECTILE", 120, 5, 10, 5, "COMMON", "Low power, short-range, ultra-fast piercing fire stream."),
