@@ -24,6 +24,39 @@ class Spark {
     }
 }
 
+// --- 追加: UI用のテキストパーティクル ---
+class UIParticle { 
+    constructor(x, y, txt, col, life=40) { 
+        this.pos = createVector(x, y); 
+        this.vel = createVector(0, -1.5); // UI上なのでゆっくり上昇
+        this.txt = txt; 
+        this.col = col; 
+        this.life = life; 
+        this.maxLife = life;
+        this.dead = false;
+    } 
+    update() { 
+        this.pos.add(this.vel); 
+        this.life--; 
+        if(this.life <= 0) this.dead = true; 
+    } 
+    draw() { 
+        push(); 
+        // カメラの影響を受けないよう translate しない
+        drawingContext.shadowBlur = 5; 
+        drawingContext.shadowColor = "#000";
+        fill(this.col); 
+        textSize(14); // 少し小さめ
+        textStyle(BOLD); 
+        textAlign(CENTER); 
+        let alpha = map(this.life, 0, this.maxLife, 0, 255);
+        fill(red(color(this.col)), green(color(this.col)), blue(color(this.col)), alpha);
+        text(this.txt, this.pos.x, this.pos.y); 
+        pop(); 
+    } 
+}
+// -----------------------------------
+
 class TextParticle { 
     constructor(x, y, txt, col, life=40) { 
         this.pos = createVector(x, y); 
@@ -145,7 +178,7 @@ class SlashEffect {
     constructor(x, y, col, size=90, isSpin=false, angle=0) { 
         this.x = x; 
         this.y = y; 
-        this.life = 12; 
+        this.life = 10; 
         this.col = col; 
         this.size = size;
         this.ang = isSpin ? random(TWO_PI) : angle; 
@@ -161,28 +194,55 @@ class SlashEffect {
         push(); 
         translate(this.x, this.y); 
         rotate(this.ang); 
-        noFill(); 
-        drawingContext.shadowBlur = 25; 
+        drawingContext.shadowBlur = 15; 
         drawingContext.shadowColor = this.col;
-        
-        // --- 変更: 斬撃をより鋭く ---
-        stroke(this.col); strokeWeight(3); 
-        fill(this.col); // 少し中身も塗る
-        
+        stroke(this.col); strokeWeight(2); 
+        fill(this.col); 
         beginShape();
-        // 三日月型の描画ロジックを鋭角化
-        for(let i = -1.2; i <= 1.2; i += 0.1) {
+        let widthFactor = 0.2; 
+        for(let i = -1.0; i <= 1.0; i += 0.1) {
             let r = this.size/2;
             vertex(cos(i)*r, sin(i)*r);
         }
-        for(let i = 1.2; i >= -1.2; i -= 0.1) {
-            let r = this.size/2 * 0.6; // 内径を小さくして鋭くする
-            vertex(cos(i)*r - 5, sin(i)*r); // 少し中心をずらす
+        for(let i = 1.0; i >= -1.0; i -= 0.1) {
+            let r = (this.size/2) * (1.0 - widthFactor * (1.0 - abs(i))); 
+            vertex(cos(i)*r - 2, sin(i)*r); 
         }
         endShape(CLOSE);
-        // -------------------------
-        
         drawingContext.shadowBlur = 0;
         pop(); 
     } 
+}
+
+class StabEffect {
+    constructor(x, y, angle, col, length=100) {
+        this.x = x;
+        this.y = y;
+        this.angle = angle;
+        this.col = col;
+        this.length = length;
+        this.life = 8;
+        this.maxLife = 8;
+        this.dead = false;
+    }
+    update() {
+        this.life--;
+        if(this.life <= 0) this.dead = true;
+    }
+    draw() {
+        push();
+        translate(this.x, this.y);
+        rotate(this.angle);
+        let progress = 1.0 - (this.life / this.maxLife);
+        let currentLen = this.length * (1.0 - pow(progress - 0.2, 2)); 
+        drawingContext.shadowBlur = 10;
+        drawingContext.shadowColor = this.col;
+        noStroke(); fill(this.col);
+        beginShape();
+        vertex(0, -3); vertex(currentLen, 0); vertex(0, 3); vertex(-10, 0);
+        endShape(CLOSE);
+        stroke(this.col); strokeWeight(1);
+        line(-20, 0, currentLen * 0.8, 0);
+        pop();
+    }
 }
