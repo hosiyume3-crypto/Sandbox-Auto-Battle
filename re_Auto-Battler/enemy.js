@@ -2,15 +2,10 @@
 
 class Enemy {
     constructor(x, y, type) {
-        // ... (省略)
         this.pos = createVector(x, y); 
         this.type = type; 
         this.dead = false;
         
-        // ... (省略)
-        this.isAlchemized = false; // 錬金術フラグ
-        
-        // ... (以下既存コードと同じ)
         this.frozenTimer = 0; 
         this.slowTimer = 0; 
         this.stunTimer = 0; 
@@ -20,13 +15,15 @@ class Enemy {
         this.drainTimer = 0; 
         this.drainDmg = 0;
         
-        // Behavioral states
         this.dashState = 0; 
         this.dashTimer = 0; 
         this.dashDir = createVector(0,0);
         this.orbitSum = 0; 
         this.orbitState = 0; 
         
+        this.noiseOffset = random(1000);
+        
+        this.isAlchemized = false;
         this.eliteTrait = null;
 
         const scaleFactor = Math.floor((wave - 1) / 5);
@@ -47,9 +44,12 @@ class Enemy {
         
         else if (type === "GUARD") { baseHp = 100; baseDmg = 10; speed = 1.2; size = 25; col = color(200,200,200); }
         else if (type === "PLAGUE") { baseHp = 250; baseDmg = 5; speed = 1.5; size = 30; col = color(0,200,0); }
-        else if (type === "MEDUSA") { baseHp = 150; baseDmg = 15; speed = 1.0; size = 28; col = color(150,150,150); }
         else if (type === "CURSER") { baseHp = 100; baseDmg = 10; speed = 1.5; size = 20; col = color(100,0,100); }
         else if (type === "HOOKER") { baseHp = 180; baseDmg = 10; speed = 1.3; size = 25; col = color(150,100,50); }
+        
+        else if (type === "WIZARD") { baseHp = 120; baseDmg = 20; speed = 1.2; size = 24; col = color(100, 50, 200); }
+        else if (type === "GOLEM") { baseHp = 400; baseDmg = 40; speed = 0.4; size = 45; col = color(100, 80, 60); }
+        else if (type === "BAT") { baseHp = 30; baseDmg = 10; speed = 2.5; size = 16; col = color(80, 50, 100); }
         
         else if (type === "P_TANK") { baseHp = 300; baseDmg = 15; speed = 0.8; size = 35; col = color(80,80,100); }
         else if (type === "P_FIGHTER") { baseHp = 150; baseDmg = 25; speed = 1.3; size = 25; col = color(150,50,50); }
@@ -63,7 +63,9 @@ class Enemy {
         this.size = size;
         this.col = col;
         
-        if(random() < 0.10 && type !== "MERCHANT") {
+        let eliteChance = 0.10 + (wave * 0.005);
+        
+        if(random() < eliteChance && type !== "MERCHANT") {
             let traits = ["POWER", "SPEED", "GIANT", "ARMOR", "REGEN"];
             this.eliteTrait = random(traits);
             if(this.eliteTrait === "POWER") { }
@@ -74,7 +76,6 @@ class Enemy {
         this.maxHp = this.hp;
     }
     
-    // ... (getClosestAlly, update メソッドはそのまま)
     getClosestAlly() {
         let closest = null; let minDist = 9999;
         for (let e of enemies) {
@@ -155,9 +156,7 @@ class Enemy {
             if (dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y) < 60 && this.shootTimer > 60) {
                 if (frameCount % 60 === 0) {
                     particles.push(new Shockwave(this.pos.x, this.pos.y, 80, "#f00"));
-                    // --- 変更: 攻撃者(this)を渡す ---
                     player.takeDamage(30, this);
-                    // ---------------------------
                     addShake(10);
                 }
             }
@@ -179,18 +178,13 @@ class Enemy {
         let dir = p5.Vector.sub(player.pos, this.pos);
         
         if(this.type === "MERCHANT") {
-            if(d < 200) {
-                dir = p5.Vector.sub(player.pos, this.pos); 
-            } else if(d < 600) {
-                dir.mult(-1); 
-            } else {
-                dir = p5.Vector.random2D(); 
-            }
+            if(d < 200) { dir = p5.Vector.sub(player.pos, this.pos); } 
+            else if(d < 600) { dir.mult(-1); } 
+            else { dir = p5.Vector.random2D(); }
         }
 
         if(this.type.startsWith("P_")) {
-             let nearestP = null;
-             let minD = 9999;
+             let nearestP = null; let minD = 9999;
              for(let e of enemies) {
                  if(e !== this && e.type.startsWith("P_") && !e.dead) {
                      let pd = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
@@ -203,8 +197,11 @@ class Enemy {
              }
         }
         
-        if (this.type === "SHOOTER" || this.type === "MEDUSA" || this.type === "CURSER" || this.type === "HOOKER" || this.type === "P_MAGE") {
-            if (d > 250) dir.setMag(spd); else if (d < 150) dir.setMag(-spd * 0.5); else dir.mult(0);
+        if (this.type === "SHOOTER" || this.type === "WIZARD" || this.type === "CURSER" || this.type === "HOOKER" || this.type === "P_MAGE") {
+            let keepDist = 250;
+            if(this.type === "WIZARD") keepDist = 300;
+            
+            if (d > keepDist) dir.setMag(spd); else if (d < keepDist - 100) dir.setMag(-spd * 0.5); else dir.mult(0);
             this.pos.add(dir); this.shootTimer--;
             if(this.shootTimer <= 0 && this.frozenTimer <= 0) { this.shoot(); this.shootTimer = 120; }
         } 
@@ -244,6 +241,13 @@ class Enemy {
                  this.pos.add(dir);
              }
         }
+        else if (this.type === "BAT") {
+            dir.setMag(spd);
+            let perp = createVector(-dir.y, dir.x).normalize();
+            let sway = perp.mult(sin(frameCount * 0.1 + this.noiseOffset) * spd * 0.8);
+            dir.add(sway);
+            this.pos.add(dir);
+        }
         else { 
             dir.setMag(spd); 
             this.pos.add(dir); 
@@ -253,13 +257,10 @@ class Enemy {
         let minDist = (this.size + player.size) / 2;
         if (distAfterMove < minDist - 2 && this.type !== "MERCHANT") {
             this.pos.add(p5.Vector.sub(this.pos, player.pos).normalize().mult((minDist-2)-distAfterMove));
-            // --- 変更: 衝突時攻撃者(this)を渡す ---
-            if(frameCount%10===0) player.takeDamage(this.dmg / 6, this); // 接触ダメージ頻度軽減のため分割
+            if(frameCount%10===0) player.takeDamage(this.dmg / 6, this); 
             else if (distAfterMove < minDist - 10) {
-                 // 完全にめり込んでいる場合は強めのダメージ
                  if(frameCount%30===0) player.takeDamage(this.dmg, this);
             }
-            // ---------------------------------
         }
         
         if ((this.type === "GUARD" || this.type === "P_TANK") && distAfterMove < 35) {
@@ -280,8 +281,10 @@ class Enemy {
                 let spread = p5.Vector.sub(player.pos, this.pos).normalize().rotate(random(-0.3, 0.3));
                 enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, spread, {val:this.dmg, tag:"POISON", color:"#0f0"}, this.dmg, 5)); 
             }
-        } else if (this.type === "MEDUSA") {
-            enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, tag:"PETRIFY", color:"#888"}, this.dmg, 6)); 
+        } else if (this.type === "WIZARD") {
+            let p = new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, color:"#a0f"}, this.dmg, 4);
+            p.homing = true; p.target = player;
+            enemyProjectiles.push(p);
         } else if (this.type === "CURSER") {
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, tag:"SLOW", color:"#50a"}, this.dmg, 6)); 
         } else if (this.type === "HOOKER") {
@@ -301,6 +304,7 @@ class Enemy {
     takeDamage(amt, cardEffect) {
         let reduction = 1.0;
         if (this.eliteTrait === "ARMOR") reduction *= 0.5;
+        if (this.type === "GOLEM") reduction *= 0.8; 
 
         for(let e of enemies) {
             if(e.type === "BARRIER" && e !== this && !e.dead && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < 150) {
@@ -319,9 +323,7 @@ class Enemy {
                 if(cardEffect.id === "stun_gun" || cardEffect.id === "thunder") { this.stunTimer = 60; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "STUN", "#ff0")); }
                 if(cardEffect.id === "icicle") this.slowTimer = 60;
                 if(cardEffect.id === "shadow_bind") { this.stunTimer = 120; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "BIND", "#a0f")); }
-                // --- 追加: 錬金術フラグ ---
                 if(cardEffect.id === "alchemy") this.isAlchemized = true;
-                // ---------------------
             } else if (cardEffect.id === "gravity" || cardEffect.id === "vortex") this.slowTimer = 90;
         }
         if (this.hp <= 0) this.dead = true;
@@ -329,17 +331,45 @@ class Enemy {
     
     draw() {
         push(); translate(this.pos.x, this.pos.y); 
-        // ... (省略) ...
-        // (drawメソッドの内容は変更なし)
         
         if(this.eliteTrait) {
             noFill(); strokeWeight(3);
-            if(this.eliteTrait === "POWER") stroke(255, 50, 50, 150);
-            if(this.eliteTrait === "SPEED") stroke(50, 255, 255, 150);
-            if(this.eliteTrait === "GIANT") stroke(255, 200, 50, 150);
-            if(this.eliteTrait === "ARMOR") stroke(50, 50, 255, 150);
-            if(this.eliteTrait === "REGEN") stroke(50, 255, 50, 150);
-            circle(0, 0, this.size + 15 + sin(frameCount * 0.1) * 5);
+            if(this.eliteTrait === "POWER") {
+                stroke(255, 50, 50, 180); strokeWeight(2);
+                beginShape();
+                for(let a=0; a<TWO_PI; a+=0.4) {
+                    let r = this.size/2 + 10 + (a%(0.8)===0 ? 5 : 0) + sin(frameCount*0.2)*2;
+                    vertex(cos(a+frameCount*0.1)*r, sin(a+frameCount*0.1)*r);
+                }
+                endShape(CLOSE);
+            }
+            else if(this.eliteTrait === "SPEED") {
+                rotate(this.pos.heading()); 
+                stroke(100, 255, 255, 150); strokeWeight(2);
+                line(-this.size, 0, -this.size-10, -5);
+                line(-this.size, 0, -this.size-10, 5);
+                rotate(-this.pos.heading());
+            }
+            else if(this.eliteTrait === "GIANT") {
+                stroke(255, 200, 50, 100); strokeWeight(4);
+                circle(0, 0, this.size + 10 + sin(frameCount*0.05)*4);
+            }
+            else if(this.eliteTrait === "ARMOR") {
+                stroke(100, 100, 255, 150); strokeWeight(2);
+                rotate(frameCount * 0.05);
+                beginShape();
+                for(let i=0; i<6; i++) {
+                    let ang = TWO_PI/6 * i;
+                    vertex(cos(ang)*(this.size/2 + 12), sin(ang)*(this.size/2 + 12));
+                }
+                endShape(CLOSE);
+                rotate(-frameCount * 0.05);
+            }
+            else if(this.eliteTrait === "REGEN") {
+                stroke(50, 255, 50, 180); strokeWeight(3);
+                let ry = -this.size/2 - 10 - (frameCount%30)/2;
+                line(-4, ry, 4, ry); line(0, ry-4, 0, ry+4);
+            }
         }
 
         drawingContext.shadowBlur = 15; drawingContext.shadowColor = this.col;
@@ -350,9 +380,7 @@ class Enemy {
         if(this.stunTimer > 0) { mainFill = color(255, 255, 0); outline = color(255,150,0); }
         if(this.poisonTimer > 0) { noStroke(); fill(0,255,0, 100); circle(0,0,this.size+5); }
         if(this.drainTimer > 0) { noFill(); stroke(150,0,255); circle(0,0,this.size+5); noStroke(); }
-        // --- 追加: 錬金術状態 ---
         if(this.isAlchemized) { noFill(); stroke(255,215,0); strokeWeight(2); circle(0,0,this.size+8); }
-        // ---------------------
         
         fill(mainFill); stroke(outline); strokeWeight(2); 
 
@@ -376,9 +404,19 @@ class Enemy {
              circle(0,0,this.size);
              fill(0,100,0); rect(-5,-5,10,10);
         }
-        else if (this.type === "MEDUSA") {
-             beginShape(); vertex(0,-15); vertex(10,5); vertex(0,15); vertex(-10,5); endShape(CLOSE);
-             fill(100); rect(-5,-5,10,5); 
+        else if (this.type === "WIZARD") {
+             triangle(0, -this.size, -this.size/2, 0, this.size/2, 0);
+             rect(-this.size/2, 0, this.size, this.size/2);
+        }
+        else if (this.type === "GOLEM") {
+             rect(-this.size/2, -this.size/2, this.size, this.size, 8);
+             fill(50); rect(-10, -5, 20, 10);
+        }
+        else if (this.type === "BAT") {
+             fill(this.col);
+             triangle(0, 0, -this.size, -10, -this.size, 10);
+             triangle(0, 0, this.size, -10, this.size, 10);
+             fill(255); circle(0, 0, 8);
         }
         else if (this.type === "CURSER") {
              rect(-10,-15,20,30);
