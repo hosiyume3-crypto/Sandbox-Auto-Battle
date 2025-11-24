@@ -18,7 +18,7 @@ let killsForNextSp = 10;
 let libraryTab = "ACTION"; 
 let libraryActionFilter = "ALL"; 
 let isPaused = false;
-let uiParticles = []; // 追加: UI用パーティクル配列
+let uiParticles = []; 
 
 // --- MAIN LOOP ---
 function draw() {
@@ -68,13 +68,11 @@ function draw() {
         stroke(50); line(0, height - UI_HEIGHT, width, height - UI_HEIGHT); noStroke();
         drawUI();
         
-        // --- 追加: UIパーティクルの描画 ---
         for(let i = uiParticles.length - 1; i >= 0; i--) {
             uiParticles[i].update();
             uiParticles[i].draw();
             if(uiParticles[i].dead) uiParticles.splice(i, 1);
         }
-        // -------------------------------
 
         if (gameState === "PLAY" && isPaused) {
             drawPauseMenu();
@@ -91,10 +89,12 @@ function draw() {
 function addShake(amount) { shakePower = min(shakePower + amount, 25); }
 function triggerFlash(amount) { screenFlash = min(screenFlash + amount, 150); }
 
-// --- マウスホバー状態の更新 ---
 function updateMouseHover() {
     if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
-        let startX = 40; let cardW = 120; let gap = 20;
+        let cardW = 120; let gap = 40; 
+        let totalW = CARD_CHOICES * cardW + (CARD_CHOICES - 1) * gap;
+        let startX = (width - totalW) / 2;
+        
         for(let i=0; i<CARD_CHOICES; i++) {
             let x = startX + i*(cardW+gap); let y = 150;
             if (isMouseOver(x, y, cardW, 200)) {
@@ -123,7 +123,6 @@ function updateMouseHover() {
     }
 }
 
-// --- マウス入力処理 ---
 function mousePressed() {
     if (gameState === "TITLE") {
         let btnW = 240, btnH = 50;
@@ -215,7 +214,10 @@ function mousePressed() {
         }
     }
     else if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
-        let startX = 40; let cardW = 120; let gap = 20;
+        let cardW = 120; let gap = 40; 
+        let totalW = CARD_CHOICES * cardW + (CARD_CHOICES - 1) * gap;
+        let startX = (width - totalW) / 2;
+        
         for(let i=0; i<CARD_CHOICES; i++) {
             let x = startX + i*(cardW+gap); let y = 150;
             if (isMouseOver(x, y, cardW, 200)) {
@@ -225,7 +227,6 @@ function mousePressed() {
             }
         }
         
-        // --- 追加: スキップボタン判定 ---
         let skipW = 160, skipH = 40;
         let skipX = width/2 - skipW/2;
         let skipY = 420;
@@ -233,7 +234,6 @@ function mousePressed() {
             gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
             particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKIPPED", "#999"));
         }
-        // ------------------------------
     }
     else if (gameState === "SKILL_TREE") {
         let startX = 150; let gapX = 250; 
@@ -271,10 +271,17 @@ function mousePressed() {
             }
         }
     }
+    else if (gameState === "GAME_OVER") {
+        let btnW = 240, btnH = 50;
+        let btnX = width/2 - btnW/2;
+        let btnY = height/2 + 80;
+        if (isMouseOver(btnX, btnY, btnW, btnH)) {
+            gameState = "TITLE";
+        }
+    }
 }
 
-// ... (updateGame, updateDeployables, updatePuddles, updateEnemies, spawnDrop, updateDrops, checkLevelUp, spawnEnemyGroup, updateProjectiles, distSq, createExplosion, createImpactSparks は変更なし)
-// (省略します。元のコードをそのまま使用してください)
+// --- LOGIC ---
 function updateGame() {
     const scaleFactor = Math.floor((wave - 1) / 5);
     let baseSpawnRate = 360; 
@@ -351,10 +358,13 @@ function updateEnemies() {
                 }
                 
                 let vamp = player.getStat("vampire");
-                if(vamp > 0 && random() < 0.2) {
+                // --- 変更: 確率判定撤廃 (確定回復) ---
+                if(vamp > 0) {
                     player.heal(Math.ceil(vamp));
                     particles.push(new TextParticle(player.pos.x, player.pos.y-20, "HP DRAIN", "#f00"));
                 }
+                // --------------------------------
+                
                 createExplosion(e.pos.x, e.pos.y, 0, 30, false, e.col);
                 score += 100;
             }
@@ -369,7 +379,16 @@ function spawnDrop(x, y, type) { drops.push(new Drop(x, y, type)); }
 
 function updateDrops() {
     let pickupRangeMult = (player.activeMoveCard && player.activeMoveCard.id === "move_mag") ? 3.0 : 1.0;
-    for(let e of equipment) if(e.id === "e_magnet") pickupRangeMult += 1.0;
+    
+    // --- 変更: ゴールドマグネット無限回収処理 ---
+    let infiniteRange = false;
+    for(let e of equipment) {
+        if(e.id === "e_magnet") {
+            infiniteRange = true;
+            break;
+        }
+    }
+    // ----------------------------------------
 
     for (let i = drops.length - 1; i >= 0; i--) {
         let d = drops[i];
@@ -383,9 +402,15 @@ function updateDrops() {
         if (d.type === "HEART" && player.hp >= player.maxHp) continue;
 
         let distToP = dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y);
-        if (distToP < (player.size + d.size) * pickupRangeMult) {
+        
+        // 無限範囲なら常に吸い寄せ
+        let canPickup = infiniteRange || (distToP < (player.size + d.size) * pickupRangeMult);
+
+        if (canPickup) {
             if(distToP > player.size + d.size) {
-                 d.pos.add(p5.Vector.sub(player.pos, d.pos).setMag(6));
+                 // 遠い場合は高速接近
+                 let speed = infiniteRange ? 12 : 6;
+                 d.pos.add(p5.Vector.sub(player.pos, d.pos).setMag(speed));
             } else {
                 if (d.type === "POTION") {
                     let maxPots = 3 + player.getStat("potionStockAdd");
@@ -408,7 +433,7 @@ function updateDrops() {
                     drops.splice(i, 1);
                 } else if (d.type === "HEART") {
                     player.heal(Math.ceil(player.maxHp * 0.10)); 
-                    particles.push(new TextParticle(player.pos.x, player.pos.y, "♥", "#f00"));
+                    particles.push(new TextParticle(player.pos.x, player.pos.y, "?", "#f00"));
                     drops.splice(i, 1);
                 }
             }
@@ -505,7 +530,9 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCK", "#aaf"));
                     particles.push(new Shockwave(p.pos.x, p.pos.y, 20, "#aaf"));
                     createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#aaf", 5);
-                    p.dead = true;
+                    // --- 変更: 弾を消さずに続行 ---
+                    // p.dead = true; 
+                    // --------------------------
                     continue;
                 }
             }
