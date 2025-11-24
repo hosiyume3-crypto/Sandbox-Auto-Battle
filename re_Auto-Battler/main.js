@@ -167,7 +167,9 @@ function mousePressed() {
         
         let backW = 120, backH = 50;
         let backX = width - backW - 30;
-        let backY = height - 70;
+        // --- 変更: 判定位置を修正 (height - 70 -> height - 100) ---
+        let backY = height - 100;
+        // --------------------------------------------------------
         if(isMouseOver(backX, backY, backW, backH)) {
             gameState = "TITLE";
         }
@@ -285,9 +287,14 @@ function mousePressed() {
 function updateGame() {
     const scaleFactor = Math.floor((wave - 1) / 5);
     let baseSpawnRate = 360; 
-    let rateDecrease = Math.min(180, wave * 10 + scaleFactor * 30); 
-    let spawnRate = baseSpawnRate - rateDecrease; 
-    if(spawnRate < 180) spawnRate = 180; 
+    let reduction = wave * 10 + scaleFactor * 30;
+    
+    // --- 変更: Wave 15以降は最大出現間隔を2秒(120F)まで短縮 ---
+    let maxReduction = (wave >= 15) ? 240 : 180; // 360 - 240 = 120(2s), 360 - 180 = 180(3s)
+    if (reduction > maxReduction) reduction = maxReduction;
+    
+    let spawnRate = baseSpawnRate - reduction; 
+    // ----------------------------------------------------
 
     if (frameCount % spawnRate === 0) spawnEnemyGroup();
 
@@ -358,12 +365,10 @@ function updateEnemies() {
                 }
                 
                 let vamp = player.getStat("vampire");
-                // --- 変更: 確率判定撤廃 (確定回復) ---
                 if(vamp > 0) {
                     player.heal(Math.ceil(vamp));
                     particles.push(new TextParticle(player.pos.x, player.pos.y-20, "HP DRAIN", "#f00"));
                 }
-                // --------------------------------
                 
                 createExplosion(e.pos.x, e.pos.y, 0, 30, false, e.col);
                 score += 100;
@@ -378,9 +383,8 @@ function updateEnemies() {
 function spawnDrop(x, y, type) { drops.push(new Drop(x, y, type)); }
 
 function updateDrops() {
-    let pickupRangeMult = (player.activeMoveCard && player.activeMoveCard.id === "move_mag") ? 3.0 : 1.0;
+    let pickupRangeMult = 1.0; 
     
-    // --- 変更: ゴールドマグネット無限回収処理 ---
     let infiniteRange = false;
     for(let e of equipment) {
         if(e.id === "e_magnet") {
@@ -388,7 +392,6 @@ function updateDrops() {
             break;
         }
     }
-    // ----------------------------------------
 
     for (let i = drops.length - 1; i >= 0; i--) {
         let d = drops[i];
@@ -403,12 +406,10 @@ function updateDrops() {
 
         let distToP = dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y);
         
-        // 無限範囲なら常に吸い寄せ
         let canPickup = infiniteRange || (distToP < (player.size + d.size) * pickupRangeMult);
 
         if (canPickup) {
             if(distToP > player.size + d.size) {
-                 // 遠い場合は高速接近
                  let speed = infiniteRange ? 12 : 6;
                  d.pos.add(p5.Vector.sub(player.pos, d.pos).setMag(speed));
             } else {
@@ -530,9 +531,6 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCK", "#aaf"));
                     particles.push(new Shockwave(p.pos.x, p.pos.y, 20, "#aaf"));
                     createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#aaf", 5);
-                    // --- 変更: 弾を消さずに続行 ---
-                    // p.dead = true; 
-                    // --------------------------
                     continue;
                 }
             }
