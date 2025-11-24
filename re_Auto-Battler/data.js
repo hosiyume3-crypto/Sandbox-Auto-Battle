@@ -25,12 +25,20 @@ function initLibraries() {
 
     // --- ACTION LIBRARY ---
     actionLibrary = [
-        A("boomerang", "Boomerang", "Ranged", "RANGE", "PROJECTILE", 250, 20, 30, 180, "RARE", "Throws a piercing weapon that returns."),
+        // --- 新規追加: 投擲槍 (遠距離) ---
+        A("javelin", "Javelin", "Ranged", "RANGE", "PROJECTILE", 500, 35, 40, 150, "COMMON", "Throws a piercing spear."),
+        
+        // --- 新規追加: カウンター (近接) ---
+        // duration 120 = 2秒間の構え
+        A("counter", "Counter", "Melee", "SELF", "BUFF", 0, 50, 120, 360, "RARE", "Stance: Negate next hit & ambush attacker."),
+        
+        // --- 新規追加: 錬金術 (魔法) ---
+        A("alchemy", "Alchemy", "Magic", "AOE", "DEBUFF", 200, 15, 40, 480, "RARE", "Toxic mist. Victims drop potions."),
+
+        A("boomerang", "Boomerang", "Ranged", "RANGE", "PROJECTILE", 150, 20, 30, 180, "RARE", "Throws a piercing weapon that returns."),
         A("air_raid", "Air Raid", "Ranged", "AOE", "ATK", 999, 56, 60, 900, "LEGENDARY", "Bombards random enemies from above."), 
         
-        // --- 変更: Life Drain 射程100 ---
         A("life_drain", "Life Drain", "Magic", "RANGE", "DEBUFF", 100, 0, 20, 600, "RARE", "Steals 25% of the target's Max HP."),
-        // ------------------------------
 
         A("gatotsu", "Gatotsu", "Melee", "MELEE", "ATK", 150, 14, 20, 300, "RARE", "Dashes forward. Hits all enemies in path."),
         A("shadow_bind", "Bind", "Ranged", "AOE", "DEBUFF", 250, 0, 20, 600, "RARE", "Deals no dmg, but Stuns enemies (2s)."),
@@ -39,7 +47,7 @@ function initLibraries() {
 
         A("fan_laser", "FanLaser", "Magic", "RANGE", "PROJECTILE", 400, 17, 60, 360, "LEGENDARY", "Rapidly fires 8 lasers in a wide fan shape."),
         A("flamethrower", "Flamer", "Magic", "RANGE", "PROJECTILE", 180, 4, 90, 360, "RARE", "Emits a continuous stream of fire."),
-        A("backstep", "Backstep", "Ranged", "RANGE", "PROJECTILE", 200, 14, 20, 180, "COMMON", "Shoots and quickly retreats backwards."),
+        A("backstep", "Backstep", "Ranged", "RANGE", "PROJECTILE", 80, 14, 20, 180, "COMMON", "Shoots and quickly retreats backwards."),
 
         A("giga_laser", "GigaLaser", "Magic", "RANGE", "PROJECTILE", 400, 40, 60, 500, "RARE", "Fires a massive, piercing wide laser."),
         A("orbit_fire", "Orbiter", "Magic", "SELF", "BUFF", 150, 14, 0, 600, "RARE", "Summons 4 fireballs that circle you for 5s."),
@@ -76,7 +84,7 @@ function initLibraries() {
         A("teleport", "Blink", "Magic", "SELF", "BUFF", 0, 0, 1, 180, "RARE", "Instantly move a short distance forward."), 
         A("meteor", "Meteor", "Magic", "AOE", "EXPLOSION", 0, 40, 60, 300, "RARE", "Drops a meteor on a random enemy."),
 
-        A("bow", "Bow", "Ranged", "RANGE", "ATK", 300, 14, 30, 80, "COMMON", "Basic long-range arrow shot."), 
+        A("bow", "Bow", "Ranged", "RANGE", "ATK", 250, 14, 30, 80, "COMMON", "Basic long-range arrow shot."), 
         A("m_gun", "M.Gun", "Ranged", "RANGE", "ATK", 150, 5, 5, 12, "COMMON", "Low power, rapid-fire, low range."),
         
         A("flame", "Flame", "Magic", "RANGE", "PROJECTILE", 120, 5, 10, 5, "COMMON", "Low power, short-range, ultra-fast piercing fire stream."),
@@ -87,15 +95,11 @@ function initLibraries() {
         
         A("cluster", "Cluster", "Ranged", "RANGE", "PROJECTILE", 250, 15, 40, 240, "RARE", "Fires a bomb that scatters smaller bombs on impact."),
         
-        // --- 変更: レールガン削除 (行を削除しました) ---
-
         A("shuriken","Shuriken","Ranged","RANGE","ATK", 250, 10, 15, 30, "COMMON", "Fast cooldown mid-range throwing star."),
         A("scatter", "Scatter", "Ranged", "RANGE", "ATK", 150, 8, 10, 50, "COMMON", "Fires 3 spreading pellets."),
         A("shotgun", "Shotgun", "Ranged", "RANGE", "ATK", 100, 10, 40, 120, "RARE", "Fires 5 spreading pellets at short range."),
         
-        // --- 変更: Sniper 射程200, 攻撃力40, CT7秒(420f) ---
         A("sniper", "Sniper", "Ranged", "RANGE", "ATK", 200, 40, 80, 420, "RARE", "High power, short range single shot."),
-        // -----------------------------------------------
         
         A("nova", "Nova", "Magic", "AOE", "ATK", 120, 21, 30, 180, "RARE", "A shockwave that knocks back enemies in all directions."), 
         A("fireball", "Fireball", "Magic", "RANGE", "PROJECTILE", 350, 21, 50, 150, "COMMON", "Hurls a high-power fireball."),
