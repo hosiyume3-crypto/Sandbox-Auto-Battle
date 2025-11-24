@@ -2,11 +2,15 @@
 
 class Enemy {
     constructor(x, y, type) {
+        // ... (省略)
         this.pos = createVector(x, y); 
         this.type = type; 
         this.dead = false;
         
-        // Status timers
+        // ... (省略)
+        this.isAlchemized = false; // 錬金術フラグ
+        
+        // ... (以下既存コードと同じ)
         this.frozenTimer = 0; 
         this.slowTimer = 0; 
         this.stunTimer = 0; 
@@ -25,7 +29,6 @@ class Enemy {
         
         this.eliteTrait = null;
 
-        // Scaling logic
         const scaleFactor = Math.floor((wave - 1) / 5);
         const hpBonus = scaleFactor * 20; 
         const dmgBonus = scaleFactor * 5; 
@@ -71,6 +74,7 @@ class Enemy {
         this.maxHp = this.hp;
     }
     
+    // ... (getClosestAlly, update メソッドはそのまま)
     getClosestAlly() {
         let closest = null; let minDist = 9999;
         for (let e of enemies) {
@@ -151,7 +155,9 @@ class Enemy {
             if (dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y) < 60 && this.shootTimer > 60) {
                 if (frameCount % 60 === 0) {
                     particles.push(new Shockwave(this.pos.x, this.pos.y, 80, "#f00"));
-                    player.takeDamage(30);
+                    // --- 変更: 攻撃者(this)を渡す ---
+                    player.takeDamage(30, this);
+                    // ---------------------------
                     addShake(10);
                 }
             }
@@ -172,17 +178,15 @@ class Enemy {
         let d = dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y);
         let dir = p5.Vector.sub(player.pos, this.pos);
         
-        // --- 変更: 闇商人は近くで応戦 ---
         if(this.type === "MERCHANT") {
             if(d < 200) {
-                dir = p5.Vector.sub(player.pos, this.pos); // Fight back (chase)
+                dir = p5.Vector.sub(player.pos, this.pos); 
             } else if(d < 600) {
-                dir.mult(-1); // Flee
+                dir.mult(-1); 
             } else {
-                dir = p5.Vector.random2D(); // Wander
+                dir = p5.Vector.random2D(); 
             }
         }
-        // -----------------------------
 
         if(this.type.startsWith("P_")) {
              let nearestP = null;
@@ -249,6 +253,13 @@ class Enemy {
         let minDist = (this.size + player.size) / 2;
         if (distAfterMove < minDist - 2 && this.type !== "MERCHANT") {
             this.pos.add(p5.Vector.sub(this.pos, player.pos).normalize().mult((minDist-2)-distAfterMove));
+            // --- 変更: 衝突時攻撃者(this)を渡す ---
+            if(frameCount%10===0) player.takeDamage(this.dmg / 6, this); // 接触ダメージ頻度軽減のため分割
+            else if (distAfterMove < minDist - 10) {
+                 // 完全にめり込んでいる場合は強めのダメージ
+                 if(frameCount%30===0) player.takeDamage(this.dmg, this);
+            }
+            // ---------------------------------
         }
         
         if ((this.type === "GUARD" || this.type === "P_TANK") && distAfterMove < 35) {
@@ -308,6 +319,9 @@ class Enemy {
                 if(cardEffect.id === "stun_gun" || cardEffect.id === "thunder") { this.stunTimer = 60; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "STUN", "#ff0")); }
                 if(cardEffect.id === "icicle") this.slowTimer = 60;
                 if(cardEffect.id === "shadow_bind") { this.stunTimer = 120; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "BIND", "#a0f")); }
+                // --- 追加: 錬金術フラグ ---
+                if(cardEffect.id === "alchemy") this.isAlchemized = true;
+                // ---------------------
             } else if (cardEffect.id === "gravity" || cardEffect.id === "vortex") this.slowTimer = 90;
         }
         if (this.hp <= 0) this.dead = true;
@@ -315,6 +329,8 @@ class Enemy {
     
     draw() {
         push(); translate(this.pos.x, this.pos.y); 
+        // ... (省略) ...
+        // (drawメソッドの内容は変更なし)
         
         if(this.eliteTrait) {
             noFill(); strokeWeight(3);
@@ -334,6 +350,9 @@ class Enemy {
         if(this.stunTimer > 0) { mainFill = color(255, 255, 0); outline = color(255,150,0); }
         if(this.poisonTimer > 0) { noStroke(); fill(0,255,0, 100); circle(0,0,this.size+5); }
         if(this.drainTimer > 0) { noFill(); stroke(150,0,255); circle(0,0,this.size+5); noStroke(); }
+        // --- 追加: 錬金術状態 ---
+        if(this.isAlchemized) { noFill(); stroke(255,215,0); strokeWeight(2); circle(0,0,this.size+8); }
+        // ---------------------
         
         fill(mainFill); stroke(outline); strokeWeight(2); 
 
