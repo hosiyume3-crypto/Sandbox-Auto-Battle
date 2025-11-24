@@ -165,18 +165,22 @@ class SlashEffect {
         drawingContext.shadowBlur = 25; 
         drawingContext.shadowColor = this.col;
         
-        stroke(this.col); strokeWeight(4); 
+        // --- 変更: 斬撃をより鋭く ---
+        stroke(this.col); strokeWeight(3); 
+        fill(this.col); // 少し中身も塗る
         
         beginShape();
-        for(let i = -1.0; i <= 1.0; i += 0.1) {
+        // 三日月型の描画ロジックを鋭角化
+        for(let i = -1.2; i <= 1.2; i += 0.1) {
             let r = this.size/2;
             vertex(cos(i)*r, sin(i)*r);
         }
-        for(let i = 1.0; i >= -1.0; i -= 0.1) {
-            let r = this.size/2 * 0.85; 
-            vertex(cos(i)*r - 2, sin(i)*r);
+        for(let i = 1.2; i >= -1.2; i -= 0.1) {
+            let r = this.size/2 * 0.6; // 内径を小さくして鋭くする
+            vertex(cos(i)*r - 5, sin(i)*r); // 少し中心をずらす
         }
         endShape(CLOSE);
+        // -------------------------
         
         drawingContext.shadowBlur = 0;
         pop(); 
