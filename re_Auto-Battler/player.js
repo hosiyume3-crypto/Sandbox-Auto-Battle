@@ -27,9 +27,7 @@ class Player {
         this.defBuffTimer = 0; 
         this.chargeTimer = 0; 
         
-        // --- 追加: カウンター用タイマー ---
         this.counterTimer = 0;
-        // -----------------------------
         
         this.barrierStock = 0;
         this.barrierRefillTimer = 0;
@@ -51,7 +49,6 @@ class Player {
                 else val *= (1 + e.stats[type]);
             }
         }
-        // SKILL TREE UPGRADES
         if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.15); 
         if(type === "speed") val *= (1 + this.upgrades.spd * 0.10);
         
@@ -113,9 +110,7 @@ class Player {
 
         if (this.potionUseTimer > 0) this.potionUseTimer--;
         if (this.retreatTimer > 0) this.retreatTimer--;
-        // --- 追加: カウンタータイマー減少 ---
         if (this.counterTimer > 0) this.counterTimer--;
-        // -------------------------------
         
         if (this.potionStock > 0 && this.potionUseTimer <= 0) {
             if (this.hp <= this.maxHp * 0.5) {
@@ -154,9 +149,7 @@ class Player {
                             if(e.eliteTrait === "POWER") collisionDmg *= 1.5;
                             if(e.eliteTrait === "VENOM") { this.applyStatus("POISON", 180); } 
                             
-                            // --- 変更: takeDamageに攻撃者情報を渡す ---
                             this.takeDamage(collisionDmg, e);
-                            // -------------------------------------
                             
                             if (e.type !== "P_TANK") {
                                 this.pos.add(p5.Vector.sub(this.pos, e.pos).setMag(10));
@@ -292,9 +285,7 @@ class Player {
     }
 
     processCardLogic(card) {
-        // --- 追加: カウンターは即発動 ---
         if (card.id === "counter") { this.performAction(); return; }
-        // ---------------------------
         if (card.system === "Heal" || card.id === "teleport" || card.id === "turret" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
         
         let targetEnemy;
@@ -411,18 +402,31 @@ class Player {
         let variance = random(0.8, 1.2); 
         let finalVal = Math.floor(baseVal * variance);
         
+        // --- 変更: カード名ポップアップをUI位置に表示 ---
         if(!isMultiHit) {
-            particles.push(new TextParticle(this.pos.x, this.pos.y - 30, c.name, c.color, 60));
+            // プレイヤー頭上ではなく、UI上のカード位置に表示
+            // ACTIONカードの場合
+            if (c.type === "MOVE") {
+                // MOVEMENT枠
+                uiParticles.push(new UIParticle(130 + 25, height - UI_HEIGHT + 35 - 20, c.name, c.color, 60));
+            } else {
+                // ACTION DECK枠
+                let actionDeck = deck.filter(x => x.category === "ACTION");
+                let idx = actionDeck.indexOf(c);
+                if (idx !== -1) {
+                    let x = 210 + idx * 60 + 25;
+                    uiParticles.push(new UIParticle(x, height - UI_HEIGHT + 35 - 20, c.name, c.color, 60));
+                }
+            }
         }
+        // -------------------------------------------
         
-        // --- 追加: カウンタースキルの発動 ---
         if (c.id === "counter") {
-            this.counterTimer = c.duration; // 構え時間
+            this.counterTimer = c.duration; 
             particles.push(new TextParticle(this.pos.x, this.pos.y - 50, "STANCE!", "#ff0", 90));
             createImpactSparks(this.pos.x, this.pos.y, -HALF_PI, "#ff0", 15);
             return;
         }
-        // -------------------------------
 
         if (c.id === "backstep") {
             if (this.target) {
@@ -527,7 +531,7 @@ class Player {
                         e.applyDebuff("STUN", 0, 120); 
                         particles.push(new TextParticle(e.pos.x, e.pos.y, "BIND", "#50a"));
                     } else if (c.id === "alchemy") {
-                        e.takeDamage(finalVal, c); // enemy.js側でフラグ管理
+                        e.takeDamage(finalVal, c); 
                         particles.push(new TextParticle(e.pos.x, e.pos.y, "MIST", c.color));
                     } else {
                         e.takeDamage(finalVal, c);
@@ -572,6 +576,8 @@ class Player {
                 
                 if (c.id === "hammer") {
                     particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 100, c.color));
+                } else if (c.id === "spear") {
+                    particles.push(new StabEffect(this.pos.x, this.pos.y, angle, c.color, 120));
                 } else {
                     particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 70, false, angle));
                 }
@@ -591,8 +597,11 @@ class Player {
                          if (c.id === "shield_bash") kb = 60;
                          if (c.id === "dagger") kb = 15; 
                          if (c.id === "charge") kb = 80;
-                         if (c.id === "multicut") kb = 25; // Increased to Medium
+                         if (c.id === "multicut") kb = 25; 
                          if (c.id === "barrage") kb = 10;
+                         // --- 変更: スピアのノックバック強化 ---
+                         if (c.id === "spear") kb = 100; 
+                         // ----------------------------------
                          
                          let push = p5.Vector.sub(e.pos, this.pos).setMag(kb);
                          e.pos.add(push);
@@ -661,13 +670,11 @@ class Player {
                      let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 5); 
                      projectiles.push(p);
                 } else {
-                    // --- 追加: Javelinは貫通 ---
                     let pSpeed = (c.id === "flame") ? 8 : 15;
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, pSpeed);
                     if(c.id === "boomerang" || c.id === "javelin") { p.piercing = true; }
                     if(c.id === "boomerang") { p.isBoomerang = true; }
                     projectiles.push(p);
-                    // ------------------------
                 }
             }
         }
@@ -675,28 +682,24 @@ class Player {
 
     nextCardIndex() { this.deckIndex = (this.deckIndex + 1) % deck.length; this.state = "IDLE"; }
 
-    takeDamage(amt, attacker) { // 引数 attacker 追加
+    takeDamage(amt, attacker) { 
         if (this.state === "LOOTING") {
             this.state = "IDLE";
             this.target = null;
         }
 
-        // --- 追加: カウンター処理 ---
         if (this.counterTimer > 0) {
-            this.counterTimer = 0; // 一回のみ
+            this.counterTimer = 0; 
             particles.push(new TextParticle(this.pos.x, this.pos.y-30, "COUNTER!", "#fff", 60));
             createImpactSparks(this.pos.x, this.pos.y, -HALF_PI, "#fff", 20);
             
-            // 反撃対象の決定
             let target = attacker;
-            if (!target || !target.pos) target = this.getClosestEnemy(); // 遠距離弾なら発射した敵を特定できないので近くの敵へ
+            if (!target || !target.pos) target = this.getClosestEnemy(); 
 
             if (target && !target.dead) {
-                // 背後へワープ
                 let offset = p5.Vector.sub(this.pos, target.pos).normalize().mult(-40); 
                 this.pos = p5.Vector.add(target.pos, offset);
                 
-                // 範囲攻撃
                 particles.push(new SlashEffect(target.pos.x, target.pos.y, "#fff", 100, true));
                 addShake(10);
                 
@@ -708,9 +711,8 @@ class Player {
                     }
                 }
             }
-            return; // ダメージ無効化
+            return; 
         }
-        // -------------------------
 
         if(this.invincibleTimer > 0) return;
         if(this.activeMoveCard && this.activeMoveCard.id === "move_ghost" && this.state === "MOVING" && random() < 0.3) {
@@ -741,4 +743,94 @@ class Player {
         addShake(5);
         triggerFlash(50);
     }
-    // ... (以下変更なし)
+    
+    heal(amt) { this.hp = min(this.hp + amt, this.maxHp); particles.push(new TextParticle(this.pos.x, this.pos.y, "+" + amt, "#0f0")); }
+
+    getClosestEnemy() {
+        let closest = null; let minDist = 9999;
+        for (let e of enemies) {
+            let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
+            if (d < minDist) { minDist = d; closest = e; }
+        }
+        return closest;
+    }
+
+    getFarthestEnemy() {
+        let farthest = null; let maxDist = -1;
+        for (let e of enemies) {
+            let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
+            if (d > maxDist && d < 1000) { 
+                maxDist = d; farthest = e; 
+            }
+        }
+        return farthest || enemies[0]; 
+    }
+
+    getClosestDrop() {
+        let nearest = this.getClosestEnemy();
+        if (this.invincibleTimer > 0 || (nearest && dist(this.pos.x, this.pos.y, nearest.pos.x, nearest.pos.y) < 200)) {
+            return null;
+        }
+
+        let closest = null; let minDist = 9999;
+        let maxPots = 3 + this.getStat("potionStockAdd");
+
+        for (let d of drops) {
+            if (d.type === "POTION") {
+                if (this.potionStock >= maxPots && this.hp >= this.maxHp) continue; 
+            }
+            if (d.type === "HEART" && this.hp >= this.maxHp) continue;
+            
+            let distToDrop = dist(this.pos.x, this.pos.y, d.pos.x, d.pos.y);
+            if (distToDrop < minDist) { minDist = distToDrop; closest = d; }
+        }
+        return closest;
+    }
+
+    draw() {
+        push(); translate(this.pos.x, this.pos.y);
+        drawingContext.shadowBlur = 15; drawingContext.shadowColor = "rgba(255,255,255,0.8)";
+        if(this.state==="LOOTING") { noFill(); stroke(255,215,0); circle(0,0,30); }
+        else if(this.activeMoveCard && this.state==="MOVING") { 
+            noFill(); stroke(this.activeMoveCard.color); 
+            if(this.activeMoveCard.id === "move_reflect") { strokeWeight(3); arc(0,0,50,50, -PI/3, PI/3); } 
+            else if (this.activeMoveCard.id === "move_warp") { drawingContext.setLineDash([5, 5]); circle(0,0, 30 + sin(frameCount*0.2)*5); drawingContext.setLineDash([]); }
+            else if (this.activeMoveCard.id === "move_spike") { drawingContext.setLineDash([10, 5]); circle(0,0, 30); drawingContext.setLineDash([]); }
+            else if (this.activeMoveCard.id === "move_strafe") { arc(0,0,40,40, frameCount*0.1, frameCount*0.1 + PI); }
+            else if (this.activeMoveCard.id === "move_kite") { circle(0,0,30); line(0,0,0,-25); }
+            else if (this.activeMoveCard.id === "move_barrage") { drawingContext.setLineDash([2, 2]); circle(0,0,35); drawingContext.setLineDash([]); }
+            else if (this.activeMoveCard.id === "move_phase") { 
+                drawingContext.setLineDash([15, 5]); circle(0,0, 35); drawingContext.setLineDash([]);
+                if(this.phaseTimer > 0) { noStroke(); fill(160,0,255,100); circle(0,0,35 * (this.phaseTimer/60)); }
+            }
+            else { circle(0,0,35); }
+        }
+        if(this.defBuffTimer > 0) { noFill(); stroke(0,0,255); circle(0,0,28); }
+        if(this.barrierStock > 0) { noFill(); stroke(0,255,255); strokeWeight(2); circle(0,0,38); for(let i=0; i<this.barrierStock; i++) circle(20*cos(i*2), 20*sin(i*2), 6); }
+        if(this.status.stun > 0) { noFill(); stroke(255,255,0); circle(0,0,30); } 
+        if(this.status.slow > 0) { noFill(); stroke(100,100,255); circle(0,0,32); }
+        if(this.status.poison > 0) { noFill(); stroke(0,255,0); circle(0,0,34); }
+
+        if (this.state === "CASTING") {
+            noFill(); stroke(255, 150, 0); strokeWeight(2);
+            let progress = map(this.timer, 60, 0, 0, TWO_PI);
+            arc(0, 0, 40, 40, -HALF_PI, -HALF_PI + progress);
+        }
+
+        stroke(255); strokeWeight(2); fill(this.invincibleTimer>0 && frameCount%4<2 ? 255 : 20);
+        if (this.state === "ACTING") fill(255, 200, 50);
+        circle(0, 0, this.size);
+        drawingContext.shadowBlur = 0;
+        noStroke(); fill(50,0,0); rect(-15,-25,30,4);
+        fill(0,255,100); rect(-15,-25,30*(this.hp/this.maxHp),4);
+        if(this.state === "LOOTING") { fill(255,215,0); textSize(10); textAlign(CENTER); text("!", 0, -30); }
+        
+        if(this.potionStock > 0) {
+            for(let i=0; i<this.potionStock; i++) {
+                fill(100,255,100); noStroke(); circle(-10 + i*8, -32, 6);
+            }
+        }
+
+        pop();
+    }
+}
