@@ -168,7 +168,11 @@ function drawLibrary() {
     
     let backW = 120, backH = 50;
     let backX = width - backW - 30;
-    let backY = height - 70;
+    
+    // --- 変更: 位置を30px上に移動 (height - 70 -> height - 100) ---
+    let backY = height - 100;
+    // --------------------------------------------------------
+    
     let hoverBack = isMouseOver(backX, backY, backW, backH);
     drawButton(backX, backY, backW, backH, "戻る", hoverBack, "#f55");
 }
@@ -206,14 +210,23 @@ function drawClassSelect() {
     let w = 140; let gap = 20; let sx = (width - (4*w + 3*gap))/2;
     let classesJP = ["ウォーリアー", "レンジャー", "メイジ", "フリーランサー"];
     
+    let mouseMoved = (mouseX !== pmouseX || mouseY !== pmouseY);
+
     for(let i=0; i<4; i++) {
         let x = sx + i*(w+gap); let y = 150;
-        let isHover = isMouseOver(x, y, w, 200);
         
-        stroke(i===classIndex || isHover ? color(255,255,0) : 60); 
-        strokeWeight(i===classIndex || isHover ? 3 : 1);
+        if (isMouseOver(x, y, w, 200)) {
+            if (mouseMoved) {
+                classIndex = i;
+            }
+        }
         
-        if(i===classIndex || isHover) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = "#ff0"; }
+        let isSelected = (i === classIndex);
+
+        stroke(isSelected ? color(255,255,0) : 60); 
+        strokeWeight(isSelected ? 3 : 1);
+        
+        if(isSelected) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = "#ff0"; }
         
         fill(20); rect(x,y,w,200,5); drawingContext.shadowBlur = 0;
         noStroke(); fill(255); textSize(16); text(classesJP[i], x+w/2, y+30);
@@ -323,9 +336,7 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
          text(`Lv.${c.level}`, x+w-2, y+12);
     }
 
-    // --- 変更: 中央揃えを適用 ---
     textAlign(CENTER, CENTER);
-    // -------------------------
     
     stroke(0); strokeWeight(2); fill(rarityColor); 
     textSize(9); text(c.name.substring(0,6), x+w/2, y+18);
