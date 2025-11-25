@@ -14,6 +14,14 @@ class Spark {
         this.pos.add(this.vel);
         this.vel.mult(this.drag);
         this.life--;
+        
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.pos.x) || isNaN(this.pos.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+
         if(this.life <= 0) this.dead = true;
     }
     draw() {
@@ -38,6 +46,14 @@ class UIParticle {
     update() { 
         this.pos.add(this.vel); 
         this.life--; 
+        
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.pos.x) || isNaN(this.pos.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+
         if(this.life <= 0) this.dead = true; 
     } 
     draw() { 
@@ -71,6 +87,14 @@ class TextParticle {
         this.pos.add(this.vel); 
         this.vel.y += 0.1; // Gravity
         this.life--; 
+        
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.pos.x) || isNaN(this.pos.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+
         if(this.life <= 0) this.dead = true; 
     } 
     draw() { 
@@ -97,6 +121,13 @@ class Shockwave {
         this.dead = false;
     } 
     update() { 
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.x) || isNaN(this.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+        
         this.s = lerp(this.s, this.max, 0.25); 
         this.life--; 
         if(this.life <= 0) this.dead = true; 
@@ -133,6 +164,11 @@ class ExplosionEffect {
             p.pos.add(p.vel); 
             p.life--; 
             p.size *= 0.92; 
+            
+            // --- 修正: NaN座標のパーツ削除 ---
+            if (isNaN(p.pos.x) || isNaN(p.pos.y)) p.life = 0;
+            // -----------------------------
+            
             if(p.life > 0) active++; 
         } 
         if(active === 0) this.dead = true; 
@@ -161,6 +197,13 @@ class AfterImage {
         this.dead = false;
     } 
     update() { 
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.x) || isNaN(this.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+        
         this.life--; 
         if(this.life <= 0) this.dead = true; 
     } 
@@ -186,6 +229,13 @@ class SlashEffect {
         this.dead = false;
     } 
     update() { 
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.x) || isNaN(this.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+        
         this.life--; 
         if(this.life <= 0) this.dead = true; 
         if(this.isSpin) this.ang += 0.3; 
@@ -226,6 +276,13 @@ class StabEffect {
         this.dead = false;
     }
     update() {
+        // --- 修正: NaN座標の自動削除 ---
+        if (isNaN(this.x) || isNaN(this.y)) {
+            this.dead = true;
+            return;
+        }
+        // ---------------------------
+
         this.life--;
         if(this.life <= 0) this.dead = true;
     }
