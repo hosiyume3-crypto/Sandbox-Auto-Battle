@@ -6,6 +6,10 @@ class Enemy {
         this.type = type; 
         this.dead = false;
         
+        // --- 指名手配（WANTED）ステータス ---
+        this.isWanted = false; 
+        // ----------------------------------
+
         this.frozenTimer = 0; 
         this.slowTimer = 0; 
         this.stunTimer = 0; 
@@ -21,9 +25,10 @@ class Enemy {
         this.orbitSum = 0; 
         this.orbitState = 0; 
         
-        // 司令官用パラメータ
+        // 司令官・闇商人用パラメータ
         this.minionCount = 0; 
         this.summonTimer = 60; 
+        this.mode = "RANGE"; // MERCHANT用: "RANGE" or "MELEE"
         
         this.noiseOffset = random(1000);
         this.eliteTrait = null;
@@ -56,19 +61,31 @@ class Enemy {
         else if (type === "HOOKER") { baseHp = 180; baseDmg = 10; speed = 1.3; size = 25; col = color(150,100,50); }
         else if (type === "WIZARD") { baseHp = 120; baseDmg = 20; speed = 1.2; size = 24; col = color(100, 50, 200); }
         else if (type === "GOLEM") { baseHp = 400; baseDmg = 40; speed = 0.4; size = 45; col = color(100, 80, 60); }
-        else if (type === "BAT") { baseHp = 30; baseDmg = 10; speed = 2.5; size = 16; col = color(80, 50, 100); }
+        
         else if (type === "P_TANK") { baseHp = 300; baseDmg = 15; speed = 0.8; size = 35; col = color(80,80,100); }
         else if (type === "P_FIGHTER") { baseHp = 150; baseDmg = 25; speed = 1.3; size = 25; col = color(150,50,50); }
         else if (type === "P_MAGE") { baseHp = 100; baseDmg = 15; speed = 1.0; size = 20; col = color(100,50,150); }
-        else if (type === "MERCHANT") { baseHp = 100; baseDmg = 0; speed = 3.0; size = 25; col = color(150,0,180); }
         
-        // --- 新規追加の敵 ---
         else if (type === "SNIPER") { baseHp = 80; baseDmg = 50; speed = 0; size = 22; col = color(200, 50, 50); }
         else if (type === "COMMANDER") { baseHp = 500; baseDmg = 10; speed = 1.2; size = 40; col = color(255, 215, 0); }
-        // 司令官の部下たち
         else if (type === "C_INFANTRY") { baseHp = 120; baseDmg = 15; speed = 1.0; size = 25; col = color(100, 100, 100); }
         else if (type === "C_SCOUT") { baseHp = 60; baseDmg = 12; speed = 2.5; size = 18; col = color(150, 150, 100); }
         else if (type === "C_GUNNER") { baseHp = 60; baseDmg = 15; speed = 1.2; size = 20; col = color(100, 150, 100); }
+
+        // --- 追加・変更された敵 ---
+        // 闇商人: ボス級に強化。攻撃力も高め。
+        else if (type === "MERCHANT") { baseHp = 1500; baseDmg = 25; speed = 2.5; size = 35; col = color(150,0,180); }
+        
+        // ランタン系: 浮遊する雑魚敵
+        else if (type === "LANTERN_RED") { baseHp = 40; baseDmg = 12; speed = 2.0; size = 18; col = color(200, 50, 50); }
+        else if (type === "LANTERN_PURPLE") { baseHp = 60; baseDmg = 15; speed = 1.8; size = 20; col = color(150, 50, 200); }
+        else if (type === "LANTERN_YELLOW") { baseHp = 80; baseDmg = 10; speed = 2.2; size = 18; col = color(200, 200, 50); }
+        
+        // カミカゼ: 高速特攻
+        else if (type === "KAMIKAZE") { baseHp = 30; baseDmg = 60; speed = 4.5; size = 20; col = color(255, 100, 0); }
+        
+        // メデューサ: 強敵
+        else if (type === "MEDUSA") { baseHp = 400; baseDmg = 20; speed = 1.0; size = 35; col = color(50, 150, 100); }
 
         this.hp = baseHp + wave * 5 + hpBonus; 
         this.dmg = baseDmg + dmgBonus;
@@ -76,21 +93,28 @@ class Enemy {
         this.size = size;
         this.col = col;
         
-        // エリート特性の抽選（SNIPER, COMMANDER, MERCHANT以外）
         let eliteChance = 0.10 + (wave * 0.005);
-        if(type === "SNIPER") eliteChance = 0; // スナイパーは特性なし（あるいは固定）
+        if(type === "SNIPER") eliteChance = 0;
 
         if(random() < eliteChance && type !== "MERCHANT" && type !== "COMMANDER") {
-            // 新特性 IRON（ノックバック無効）、VOID（弾消滅）を追加
             let traits = ["POWER", "SPEED", "GIANT", "ARMOR", "REGEN", "IRON", "VOID"];
             this.eliteTrait = random(traits);
             
             if(this.eliteTrait === "SPEED") { this.speed *= 1.5; }
             if(this.eliteTrait === "GIANT") { this.size *= 1.5; this.hp *= 2; }
-            // IRON, VOID はダメージ処理や弾処理で参照
         }
 
         this.maxHp = this.hp;
+    }
+    
+    getEffectiveSpeed() {
+        let spd = this.speed + (wave * 0.05);
+        if (this.frozenTimer > 0) return 0;
+        if (this.slowTimer > 0) spd *= 0.5;
+        if (this.isWanted && typeof equipment !== 'undefined') {
+            if (equipment.some(e => e.id === "iron_ball")) spd *= 0.8; 
+        }
+        return max(0, spd);
     }
     
     getClosestAlly() {
@@ -105,17 +129,15 @@ class Enemy {
     }
 
     update() {
+        if (this.frozenTimer > 0) this.frozenTimer--;
+        if (this.slowTimer > 0) this.slowTimer--;
         if(this.stunTimer > 0) { this.stunTimer--; return; } 
         
         if(this.poisonTimer > 0) {
             if(frameCount % 60 === 0) { 
                 let poisonDmg = Math.ceil(this.maxHp * 0.03);
                 this.takeDamage(poisonDmg); 
-                
-                if(player && equipment.some(e => e.id === "e_absorb")) {
-                    player.heal(3);
-                }
-
+                if(player && equipment.some(e => e.id === "e_absorb")) player.heal(3);
                 particles.push(new TextParticle(this.pos.x, this.pos.y-5, floor(poisonDmg), "#0f0")); 
             }
             this.poisonTimer--;
@@ -136,10 +158,7 @@ class Enemy {
         }
         
         if(this.type === "BARRIER") {
-            let spd = this.speed + (wave * 0.05);
-            if(this.frozenTimer > 0) spd = 0;
-            else if(this.slowTimer > 0) spd *= 0.5;
-            
+            let spd = this.getEffectiveSpeed();
             let dir;
             let playerVector = p5.Vector.sub(player.pos, this.pos);
             let closestAlly = this.getClosestAlly(); 
@@ -150,7 +169,6 @@ class Enemy {
             
             let d = playerVector.mag();
             if (d < 50) dir = playerVector.mult(-1).normalize(); 
-            
             dir.setMag(spd);
             this.pos.add(dir);
             if(frameCount % 60 === 0) particles.push(new Shockwave(this.pos.x, this.pos.y, 100, "#00f"));
@@ -183,96 +201,85 @@ class Enemy {
                 }
             }
         } else if (this.type === "SNIPER") {
-            // スナイパーは移動しない。射撃のみ行う。
             this.shootTimer--;
             if(this.shootTimer <= 0 && this.frozenTimer <= 0) {
                 this.shoot();
-                this.shootTimer = 240; // 4秒間隔
+                this.shootTimer = 240; 
             }
         } else if (this.type === "COMMANDER") {
-            // 司令官の挙動
-            // 1. 移動: プレイヤーと一定距離(500)を保つ
             let d = dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y);
             let desiredDist = 500;
             let moveDir = p5.Vector.sub(player.pos, this.pos);
+            let spd = this.getEffectiveSpeed();
+            if (d < desiredDist - 50) { moveDir.mult(-1).normalize().setMag(spd); this.pos.add(moveDir); } 
+            else if (d > desiredDist + 50) { moveDir.normalize().setMag(spd); this.pos.add(moveDir); }
             
-            let spd = this.speed + (wave * 0.05);
-            if(this.frozenTimer > 0) spd = 0;
-            else if(this.slowTimer > 0) spd *= 0.5;
-
-            if (d < desiredDist - 50) {
-                // 近すぎるので逃げる
-                moveDir.mult(-1).normalize().setMag(spd);
-                this.pos.add(moveDir);
-            } else if (d > desiredDist + 50) {
-                // 遠すぎるので近づく
-                moveDir.normalize().setMag(spd);
-                this.pos.add(moveDir);
-            }
-            
-            // 2. 召喚ロジック
             this.summonTimer--;
             if (this.summonTimer <= 0) {
-                // 自分の部下（C_から始まるタイプ）の数をカウント
                 let minions = enemies.filter(e => e.type.startsWith("C_") && !e.dead);
-                if (minions.length < 5) {
-                    this.summonMinion();
-                    this.summonTimer = 180; // 3秒クールダウン
-                } else {
-                    this.summonTimer = 60; // 満員なら1秒後に再チェック
-                }
+                if (minions.length < 5) { this.summonMinion(); this.summonTimer = 180; } else { this.summonTimer = 60; }
             }
-
+        } else if (this.type === "KAMIKAZE") {
+            // カミカゼ: 常にプレイヤーに向かって加速
+            let spd = this.getEffectiveSpeed() * 1.5;
+            let dir = p5.Vector.sub(player.pos, this.pos).normalize().setMag(spd);
+            this.pos.add(dir);
+            if(frameCount % 5 === 0) particles.push(new Spark(this.pos.x, this.pos.y, "#f50", dir.heading() + PI, 5, 10));
         } else {
             this.moveNormal();
         }
         
-        // 座標のNaNチェック
-        if (isNaN(this.pos.x) || isNaN(this.pos.y) || !isFinite(this.pos.x) || !isFinite(this.pos.y)) {
-            this.dead = true;
-            return;
-        }
-        
+        if (isNaN(this.pos.x) || isNaN(this.pos.y) || !isFinite(this.pos.x) || !isFinite(this.pos.y)) { this.dead = true; return; }
         let margin = this.size / 2;
         this.pos.x = constrain(this.pos.x, margin, WORLD_W - margin);
         this.pos.y = constrain(this.pos.y, margin, WORLD_H - margin);
     }
     
     summonMinion() {
-        // 自分とプレイヤーの間に召喚
         let spawnDir = p5.Vector.sub(player.pos, this.pos).normalize();
         let spawnPos = p5.Vector.add(this.pos, spawnDir.mult(60));
-        
-        // ランダムな部下を選択
         let types = ["C_INFANTRY", "C_SCOUT", "C_GUNNER"];
         let type = random(types);
-        
         let minion = new Enemy(spawnPos.x, spawnPos.y, type);
         enemies.push(minion);
-        
-        // エフェクト
         particles.push(new Shockwave(spawnPos.x, spawnPos.y, 50, "#ff0"));
         particles.push(new TextParticle(spawnPos.x, spawnPos.y - 20, "SUMMON", "#fff"));
     }
 
     moveNormal() {
-        let spd = this.speed + (wave * 0.05);
-        if(this.frozenTimer > 0) { spd = 0; this.frozenTimer--; }
-        if(this.slowTimer > 0) { spd *= 0.5; this.slowTimer--; }
-        
+        let spd = this.getEffectiveSpeed();
         let d = dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y);
         let dir = p5.Vector.sub(player.pos, this.pos);
         
+        // --- 変更: 闇商人の近接/遠距離切り替えAI ---
         if(this.type === "MERCHANT") {
-            if(d < 200) { dir = p5.Vector.sub(player.pos, this.pos); } 
-            else if(d < 600) { dir.mult(-1); } 
-            else { dir = p5.Vector.random2D(); }
+            if (d < 180) {
+                this.mode = "MELEE";
+                // 近接モード: 移動速度アップして突っ込む
+                dir.setMag(spd * 1.5);
+                this.pos.add(dir);
+            } else {
+                this.mode = "RANGE";
+                // 遠距離モード: 距離を保つ
+                let keepDist = 350;
+                if (d > keepDist) dir.setMag(spd);
+                else if (d < keepDist - 50) dir.setMag(-spd);
+                else dir.mult(0);
+                this.pos.add(dir);
+                
+                this.shootTimer--;
+                if(this.shootTimer <= 0 && this.frozenTimer <= 0) { 
+                    this.shoot(); 
+                    this.shootTimer = 40; // 連射速度
+                }
+            }
+            return;
         }
+        // ----------------------------------------
 
         if(this.type.startsWith("P_") || this.type.startsWith("C_")) {
-             // C_ は司令官の部下。P_ と同様に群れる挙動を入れる
              let nearestP = null; let minD = 9999;
-             let prefix = this.type.substring(0, 2); // "P_" or "C_"
+             let prefix = this.type.substring(0, 2); 
              for(let e of enemies) {
                  if(e !== this && e.type.startsWith(prefix) && !e.dead) {
                      let pd = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
@@ -285,9 +292,10 @@ class Enemy {
              }
         }
         
-        if (this.type === "SHOOTER" || this.type === "WIZARD" || this.type === "CURSER" || this.type === "HOOKER" || this.type === "P_MAGE" || this.type === "C_GUNNER") {
+        if (this.type === "SHOOTER" || this.type === "WIZARD" || this.type === "CURSER" || this.type === "HOOKER" || this.type === "P_MAGE" || this.type === "C_GUNNER" || this.type === "MEDUSA") {
             let keepDist = 250;
             if(this.type === "WIZARD") keepDist = 300;
+            if(this.type === "MEDUSA") keepDist = 200;
             
             if (d > keepDist) dir.setMag(spd); else if (d < keepDist - 100) dir.setMag(-spd * 0.5); else dir.mult(0);
             this.pos.add(dir); this.shootTimer--;
@@ -330,13 +338,6 @@ class Enemy {
                  this.pos.add(dir);
              }
         }
-        else if (this.type === "BAT") {
-            dir.setMag(spd);
-            let perp = createVector(-dir.y, dir.x).normalize();
-            let sway = perp.mult(sin(frameCount * 0.1 + this.noiseOffset) * spd * 0.8);
-            dir.add(sway);
-            this.pos.add(dir);
-        }
         else { 
             dir.setMag(spd); 
             this.pos.add(dir); 
@@ -350,6 +351,13 @@ class Enemy {
             else if (distAfterMove < minDist - 10) {
                  if(frameCount%30===0) player.takeDamage(this.dmg, this);
             }
+        }
+        // MERCHANTの接触ダメージ（近接モード時）
+        if (this.type === "MERCHANT" && distAfterMove < minDist) {
+             if(frameCount%20===0) {
+                 player.takeDamage(this.dmg * 1.5, this); // 近接は痛い
+                 addShake(5);
+             }
         }
         
         if ((this.type === "GUARD" || this.type === "P_TANK" || this.type === "C_INFANTRY") && distAfterMove < 35) {
@@ -379,12 +387,19 @@ class Enemy {
         } else if (this.type === "HOOKER") {
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, tag:"HOOK", color:"#963"}, this.dmg, 12)); 
         } else if (this.type === "SNIPER") {
-            // スナイパーの弾：超高速・高火力
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, color:"#f00"}, this.dmg, 25)); 
             particles.push(new Shockwave(this.pos.x, this.pos.y, 30, "#f00"));
         } else if (this.type === "C_GUNNER") {
              enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, color:"#afa"}, this.dmg, 8)); 
-        } else {
+        } 
+        else if (this.type === "MERCHANT") {
+             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {id:"throwing_knife", val:this.dmg, color:"#fff"}, this.dmg, 12)); 
+        }
+        else if (this.type === "MEDUSA") {
+             // 石化弾
+             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg, tag:"PETRIFY", color:"#888"}, this.dmg, 6)); 
+        }
+        else {
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), {val:this.dmg}, this.dmg, 4)); 
         }
     }
@@ -407,9 +422,19 @@ class Enemy {
                 break;
             }
         }
+
+        // --- 指名手配（WANTED）によるダメージ増加 ---
+        if (this.isWanted) {
+            reduction *= 1.5; 
+            if (frameCount % 10 === 0) particles.push(new TextParticle(this.pos.x, this.pos.y - 40, "WANTED!", "#f55"));
+        }
+        // ----------------------------------------
+
         let finalDmg = Math.floor(amt * reduction);
         this.hp -= finalDmg;
         let col = reduction < 1.0 ? "#88f" : "#fff";
+        if (this.isWanted && reduction >= 1.5) col = "#f55"; 
+
         particles.push(new TextParticle(this.pos.x, this.pos.y, finalDmg, col));
         
         if(cardEffect) {
@@ -418,6 +443,7 @@ class Enemy {
                 if(cardEffect.id === "stun_gun" || cardEffect.id === "thunder") { this.stunTimer = 60; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "STUN", "#ff0")); }
                 if(cardEffect.id === "icicle") this.slowTimer = 60;
                 if(cardEffect.id === "shadow_bind") { this.stunTimer = 120; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "BIND", "#a0f")); }
+                if(cardEffect.id === "lasso") { this.stunTimer = 60; }
             } else if (cardEffect.id === "gravity" || cardEffect.id === "vortex") this.slowTimer = 90;
         }
         if (this.hp <= 0) this.dead = true;
@@ -514,12 +540,6 @@ class Enemy {
              rect(-this.size/2, -this.size/2, this.size, this.size, 8);
              fill(50); rect(-10, -5, 20, 10);
         }
-        else if (this.type === "BAT") {
-             fill(this.col);
-             triangle(0, 0, -this.size, -10, -this.size, 10);
-             triangle(0, 0, this.size, -10, this.size, 10);
-             fill(255); circle(0, 0, 8);
-        }
         else if (this.type === "CURSER") {
              rect(-10,-15,20,30);
              fill(50,0,50); circle(0,-10,10);
@@ -534,10 +554,9 @@ class Enemy {
              stroke(0); line(0,0, 20,0);
         }
         else if (this.type === "COMMANDER") {
-             // 司令官の見た目
              rect(-20, -20, 40, 40, 5);
-             fill(255); rect(-10, -25, 20, 10); // 帽子
-             fill(200, 0, 0); rect(-5, -5, 10, 20); // マント
+             fill(255); rect(-10, -25, 20, 10); 
+             fill(200, 0, 0); rect(-5, -5, 10, 20); 
         }
         else if (this.type === "SWARM") { 
             rect(-this.size/2, -this.size/2, this.size, this.size);
@@ -594,9 +613,53 @@ class Enemy {
             fill(255, 255, 0); circle(-2, -5, 2); circle(2, -5, 2); 
         }
         
+        // --- 新規追加した敵の描画 ---
+        else if (this.type.startsWith("LANTERN")) {
+            // 浮遊するランタン
+            noStroke(); fill(this.col);
+            ellipse(0, 0, this.size, this.size * 1.2);
+            fill(255, 255, 200, 200); 
+            circle(0, 0, this.size * 0.6); // 光
+        }
+        else if (this.type === "KAMIKAZE") {
+            // 赤く点滅する自爆敵
+            fill(frameCount % 10 < 5 ? "#f50" : "#500");
+            triangle(0, -this.size, -this.size/2, this.size/2, this.size/2, this.size/2);
+        }
+        else if (this.type === "MEDUSA") {
+            // メデューサ
+            fill(this.col);
+            rect(-15, -20, 30, 40, 5); // 体
+            fill(50, 200, 50); // 蛇髪
+            for(let i=0; i<5; i++) {
+                let angle = map(i, 0, 4, -PI/2, PI/2);
+                let hx = cos(angle - PI/2) * 15;
+                let hy = sin(angle - PI/2) * 15 - 20;
+                circle(hx, hy, 8);
+            }
+        }
+        // ---------------------------
+        
         drawingContext.shadowBlur = 0;
         noStroke(); fill(50,0,0); rect(-10,-20,20,4);
         fill(0,255,100); rect(-10,-20,20*(this.hp/this.maxHp),4);
+        
+        // --- 指名手配マークの描画 ---
+        if (this.isWanted) {
+            push();
+            translate(0, -this.size - 25);
+            drawingContext.shadowBlur = 10;
+            drawingContext.shadowColor = "#f00";
+            fill(240, 230, 200); stroke(100, 50, 0); strokeWeight(1);
+            rect(-15, -10, 30, 20, 2);
+            noStroke(); fill(150, 0, 0);
+            textSize(7); textAlign(CENTER, CENTER); textStyle(BOLD);
+            text("WANTED", 0, -5);
+            fill(50); rect(-8, 0, 16, 8);
+            pop();
+        }
+        // -------------------------
+
         pop();
     }
 }
