@@ -25,15 +25,29 @@ function initLibraries() {
 
     // --- ACTION LIBRARY (日本語) ---
     actionLibrary = [
-        // --- 毒ビルド用カード (調整済み) ---
+        // --- 指名手配（WANTED）シナジーカード ---
+        A("wanted_poster", "指名手配書", "Ranged", "RANGE", "DEBUFF", 600, 5, 20, 180, "COMMON", "対象を[指名手配]にする。既にある場合は発動しない。"),
+        A("lasso", "投げ縄", "Ranged", "RANGE", "DEBUFF", 400, 10, 30, 240, "COMMON", "[指名手配]の敵が居る時のみ発動。引き寄せスタン。"),
+        
+        A("revolver", "リボルバー", "Ranged", "RANGE", "ATK", 150, 10, 40, 180, "LEGENDARY", "至近6連射。[指名手配]には威力2倍。"),
+        
+        A("deputy_shotgun", "保安官の散弾銃", "Ranged", "RANGE", "ATK", 80, 15, 30, 240, "RARE", "扇状発射。[指名手配]には威力増。"),
+        
+        A("desert_eagle", "デザートイーグル", "Ranged", "RANGE", "PROJECTILE", 250, 60, 40, 180, "RARE", "高威力の大型拳銃。"),
+
+        A("execution", "処刑執行", "Ranged", "RANGE", "ATK", 200, 80, 20, 600, "LEGENDARY", "至近距離への強力な一撃。"),
+
+        // --- 毒ビルド用カード ---
         A("poison_flask", "毒フラスコ", "Magic", "RANGE", "PROJECTILE", 300, 10, 40, 60, "COMMON", "着弾地点に毒をばら撒く。毒の敵には威力増。"),
         A("bane_bolt", "ベインボルト", "Magic", "MELEE", "ATK", 90, 10, 10, 60, "RARE", "高速の魔法斬撃。毒の敵を切り刻む。"),
         A("toxic_mist", "トキシックミスト", "Magic", "RANGE", "PROJECTILE", 400, 10, 60, 600, "COMMON", "着弾点に毒の霧を発生させる弾を放つ。"),
         A("venom_whip", "ベノムウィップ", "Magic", "AOE", "ATK", 150, 20, 20, 120, "RARE", "前方を一掃。毒の敵に威力3倍。"),
         A("pandemic", "パンデミック", "Magic", "AOE", "ATK", 300, 50, 60, 480, "LEGENDARY", "広範囲攻撃。毒の敵には2倍ダメージ。"),
 
-        // --- 既存カード (タレット系削除済み) ---
-        A("super_ball", "スーパーボール", "Ranged", "RANGE", "PROJECTILE", 300, 25, 300, 480, "LEGENDARY", "6方向に発射。壁と敵で跳ね返る。"),
+        // --- 既存カード ---
+        // 変更: durationを10に短縮 (即座に次の行動へ)
+        A("super_ball", "スーパーボール", "Ranged", "RANGE", "PROJECTILE", 300, 25, 10, 480, "LEGENDARY", "ランダムに6発発射。5回反射する。"),
+        
         A("gear", "ギア", "Ranged", "RANGE", "PROJECTILE", 999, 25, 120, 240, "RARE", "画面端で5回跳ねる貫通弾。"),
         A("homing_missile", "ミサイル", "Ranged", "RANGE", "PROJECTILE", 600, 18, 60, 300, "RARE", "敵を追尾する弾を複数発射。"),
         A("intercept", "迎撃", "Ranged", "RANGE", "ATK", 50, 80, 10, 480, "COMMON", "至近距離への超高威力射撃。"),
@@ -85,7 +99,7 @@ function initLibraries() {
         A("cluster", "クラスター弾", "Ranged", "RANGE", "PROJECTILE", 250, 15, 40, 240, "RARE", "分裂する爆弾を発射する。"),
         A("shuriken","手裏剣","Ranged","RANGE","ATK", 250, 10, 15, 30, "COMMON", "高回転の投擲武器。"),
         A("scatter", "散弾", "Ranged", "RANGE", "ATK", 150, 8, 10, 50, "COMMON", "3方向に弾をばら撒く。"),
-        A("shotgun", "ショットガン", "Ranged", "RANGE", "ATK", 100, 10, 40, 120, "RARE", "近距離で多数の弾を放つ。"),
+        A("shotgun", "ショットガン", "Ranged", "RANGE", "ATK", 100, 12, 40, 120, "RARE", "近距離で多数の弾を放つ。"),
         A("sniper", "スナイパー", "Ranged", "RANGE", "ATK", 200, 40, 80, 420, "RARE", "高威力・長射程の狙撃。"),
         A("nova", "ノヴァ", "Magic", "AOE", "ATK", 120, 21, 30, 180, "RARE", "全方位に弾き飛ばす衝撃波。"), 
         A("fireball", "ファイアボール", "Magic", "RANGE", "PROJECTILE", 350, 21, 50, 150, "COMMON", "高威力の火球を放つ。"),
@@ -95,7 +109,7 @@ function initLibraries() {
         A("heal", "ヒール", "Heal", "SELF", "HEAL", 0, 28, 40, 600, "LEGENDARY", "自身のHPを回復する。"),
     ];
 
-    // --- EQUIPMENT LIBRARY (タレット強化削除済み) ---
+    // --- EQUIPMENT LIBRARY ---
     equipLibrary = [
         E("e_swd", "鉄の剣", {melee:0.20}, "#e66", "近接ダメージ+20%"),
         E("e_bow", "ロングボウ", {range:0.20}, "#6e6", "遠距離ダメージ+20%"),
@@ -103,6 +117,10 @@ function initLibraries() {
         E("e_arm", "プレートメイル", {def:0.10}, "#88a", "被ダメージ-10%"),
         E("e_ring", "ルビーの指輪", {melee:0.15, range:0.15, magic:0.15}, "#d44", "全ダメージ+15%"),
         E("e_amul", "時のアミュレット", {cdr:0.05}, "#aa4", "クールダウン短縮-5%"),
+        
+        // --- 追加: 指名手配系装備 ---
+        E("iron_ball", "鉄球", {}, "#888", "[指名手配]の敵の移動速度-20%"),
+        E("handcuffs", "手錠", {}, "#ccc", "[指名手配]の敵からの被ダメ-30%"),
         
         E("e_belt", "ポーションベルト", {potionStockAdd: 2}, "#852", "ポーション所持数+2"),
         E("e_wand", "魔法の杖", {magic: 0.20}, "#c6f", "魔法ダメージ+20%"),
