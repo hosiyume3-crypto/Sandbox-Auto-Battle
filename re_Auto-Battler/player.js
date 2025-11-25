@@ -34,8 +34,6 @@ class Player {
         
         this.lastTargetAcquireTime = 0; 
         
-        this.retreatTimer = 0; 
-
         this.status = { stun:0, slow:0, poison:0, poisonDmg:0 };
     }
 
@@ -49,7 +47,7 @@ class Player {
                 else val *= (1 + e.stats[type]);
             }
         }
-        if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.15); 
+        if(type === "melee" || type === "range" || type === "magic") val *= (1 + this.upgrades.atk * 0.12); 
         if(type === "speed") val *= (1 + this.upgrades.spd * 0.10);
         
         if(type === "rangeAdd") val += this.upgrades.range * 0.10; 
@@ -62,10 +60,8 @@ class Player {
             }
             if(e.id === "e_battery" && type === "cdMult") val -= 0.10; 
             if(e.id === "e_titan") {
-                // --- 変更: タイタングローブ強化 ---
                 if(type === "melee" || type === "range" || type === "magic") val *= 1.50; 
                 if(type === "cdMult") val += 0.30; 
-                // ------------------------------
             }
         }
         if(type === "cdMult" && this.status.slow > 0) val += 0.10; 
@@ -78,8 +74,22 @@ class Player {
         if(type === "POISON") { this.status.poison = duration; particles.push(new TextParticle(this.pos.x, this.pos.y-20, "POISON", "#0f0")); }
     }
 
+    // --- 追加: 座標の安全化処理 ---
+    // 座標が壊れた(NaN)場合に復帰させ、画面外に出ないように制限する
+    constrainPosition() {
+        // 座標が非数(NaN)または無限大(Infinity)になっていたら中央にリセット
+        if (isNaN(this.pos.x) || isNaN(this.pos.y) || !isFinite(this.pos.x) || !isFinite(this.pos.y)) {
+            this.pos.set(WORLD_W/2, WORLD_H/2);
+        }
+        
+        let margin = this.size / 2 + 2;
+        this.pos.x = constrain(this.pos.x, margin, WORLD_W - margin);
+        this.pos.y = constrain(this.pos.y, margin, WORLD_H - margin);
+    }
+    // ---------------------------
+
     update() {
-        this.maxHp = 200 + this.upgrades.hp * 25 + this.getStat("hpAdd");
+        this.maxHp = 200 + this.upgrades.hp * 20 + this.getStat("hpAdd");
         
         let hasBarrier = equipment.some(e => e.id === "e_barrier");
         if(hasBarrier) {
@@ -111,7 +121,6 @@ class Player {
         }
 
         if (this.potionUseTimer > 0) this.potionUseTimer--;
-        if (this.retreatTimer > 0) this.retreatTimer--;
         if (this.counterTimer > 0) this.counterTimer--;
         
         if (this.potionStock > 0 && this.potionUseTimer <= 0) {
@@ -154,7 +163,11 @@ class Player {
                             this.takeDamage(collisionDmg, e);
                             
                             if (e.type !== "P_TANK") {
-                                this.pos.add(p5.Vector.sub(this.pos, e.pos).setMag(10));
+                                // --- 修正: 0距離接触時のエラー回避 ---
+                                let pushDir = p5.Vector.sub(this.pos, e.pos);
+                                if (pushDir.magSq() === 0) pushDir = p5.Vector.random2D(); // 完全に重なっていたらランダム
+                                this.pos.add(pushDir.setMag(10));
+                                // --------------------------------
                             }
                             
                             for(let eq of equipment) { if(eq.id === "e_thorns") e.takeDamage(10); }
@@ -196,17 +209,6 @@ class Player {
                 }
             }
             
-            if ((playerClass === "MAGE" || playerClass === "RANGER") && this.retreatTimer <= 0) {
-                let nearEnemy = this.getClosestEnemy();
-                if (nearEnemy && dist(this.pos.x, this.pos.y, nearEnemy.pos.x, nearEnemy.pos.y) < 60) {
-                    let runDir = p5.Vector.sub(this.pos, nearEnemy.pos).normalize();
-                    this.pos.add(runDir.mult(150)); 
-                    particles.push(new TextParticle(this.pos.x, this.pos.y - 20, "ESCAPE!", "#fff"));
-                    particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#fff", 10));
-                    this.retreatTimer = 300; 
-                }
-            }
-            
             if (this.activeMoveCard && this.activeMoveCard.id === "move_barrage" && frameCount % 10 === 0) {
                 let target = this.getClosestEnemy();
                 if (target && dist(this.pos.x, this.pos.y, target.pos.x, target.pos.y) < 400) {
@@ -238,10 +240,7 @@ class Player {
             this.timer--;
             if(this.currentCard) {
                 if (this.currentCard.id === "martial_arts" && this.timer % 5 === 0) this.performAction(true);
-                
-                // --- 追加: 槍撃乱舞 (連撃の強化版) ---
                 if (this.currentCard.id === "spear_flurry" && this.timer % 4 === 0 && this.timer > 0) this.performAction(true);
-                // ---------------------------------
                 
                 if ((this.currentCard.id === "multicut" || this.currentCard.id === "m_gun") && this.timer % 5 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "barrage" && this.timer % 15 === 0 && this.timer > 0) this.performAction(true);
@@ -250,6 +249,7 @@ class Player {
                 if (this.currentCard.id === "gatotsu" && this.target) {
                     let dashDir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                     this.pos.add(dashDir.mult(40)); 
+                    this.constrainPosition(); // 移動後の安全確認
                     particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#f00", 5));
                 }
             }
@@ -270,9 +270,8 @@ class Player {
              if (deck.some(c => c.category === "ACTION" && c.currentCooldown <= 0)) this.state = "IDLE";
         }
         
-        let margin = this.size / 2 + 2;
-        this.pos.x = constrain(this.pos.x, margin, WORLD_W - margin);
-        this.pos.y = constrain(this.pos.y, margin, WORLD_H - margin);
+        // --- 最終的な座標チェック ---
+        this.constrainPosition();
     }
 
     findNextCard() {
@@ -294,7 +293,7 @@ class Player {
 
     processCardLogic(card) {
         if (card.id === "counter") { this.performAction(); return; }
-        if (card.system === "Heal" || card.id === "teleport" || card.id === "turret" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
+        if (card.system === "Heal" || card.id === "teleport" || card.id.includes("turret") || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
         
         let targetEnemy;
         if (card.id === "assassin" || card.id === "gatotsu") targetEnemy = this.getFarthestEnemy();
@@ -308,6 +307,7 @@ class Player {
         if (card.id === "intercept") {
             let distToTarget = dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y);
             if (distToTarget > card.range) {
+                this.deckIndex = (this.deckIndex + 1) % deck.length;
                 this.state = "IDLE"; 
                 return;
             }
@@ -341,6 +341,7 @@ class Player {
             if (dist(this.pos.x, this.pos.y, this.target.pos.x, this.target.pos.y) > 100) {
                 particles.push(new ExplosionEffect(this.pos.x, this.pos.y, "#a0f", 20)); 
                 this.pos = p5.Vector.add(this.target.pos, p5.Vector.random2D().setMag(40));
+                this.constrainPosition(); // Warp constraint
                 particles.push(new Shockwave(this.pos.x, this.pos.y, 50, "#a0f")); 
                 this.warpTimer = 90; addShake(3); return;
             }
@@ -350,6 +351,8 @@ class Player {
         if(this.status.slow > 0) speed *= 0.5;
 
         if(this.activeMoveCard && this.activeMoveCard.id === "move_dash") speed *= 1.4; 
+        
+        if(this.activeMoveCard && this.activeMoveCard.id === "move_sonic") speed *= 2.5;
 
         let dir;
         if (this.state === "LOOTING") {
@@ -367,11 +370,6 @@ class Player {
                     dir = tangent.add(approach).normalize();
                 }
             } 
-            else if (this.activeMoveCard && this.activeMoveCard.id === "move_kite") {
-                if (distToTarget < 120) dir = vecToTarget.mult(-1).normalize(); 
-                else if (distToTarget > 180) dir = vecToTarget.normalize(); 
-                else dir = vecToTarget.rotate(HALF_PI).normalize();
-            } 
             else {
                 dir = vecToTarget.normalize();
             }
@@ -379,13 +377,6 @@ class Player {
         
         if(this.activeMoveCard && this.activeMoveCard.id === "move_phase") {
             this.pos.add(dir.mult(speed));
-            if(this.state === "MOVING") {
-                if(this.phaseTimer <= 0) {
-                    this.pos.add(dir.copy().setMag(50));
-                    particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#a0f", 10));
-                    this.phaseTimer = 60;
-                }
-            }
         }
         else {
             this.pos.add(dir.mult(speed));
@@ -418,6 +409,9 @@ class Player {
         let variance = random(0.8, 1.2); 
         let finalVal = Math.floor(baseVal * variance);
         
+        let poisonDurMult = 1.0;
+        if(equipment.some(e => e.id === "e_plague")) poisonDurMult = 1.5;
+        
         if(!isMultiHit) {
             if (c.type === "MOVE") {
                 uiParticles.push(new UIParticle(130 + 25, height - UI_HEIGHT + 35 - 20, c.name, c.color, 60));
@@ -443,6 +437,7 @@ class Player {
                 let dir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                 projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 15));
                 this.pos.add(dir.mult(-60)); 
+                this.constrainPosition(); // Backstep constraint
                 particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#fff", 10));
             }
             return;
@@ -453,16 +448,23 @@ class Player {
             if(this.target) blinkDir = p5.Vector.sub(this.target.pos, this.pos).normalize();
             else blinkDir = p5.Vector.random2D();
             this.pos.add(blinkDir.mult(150));
+            this.constrainPosition(); // Teleport constraint
             particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#0ff", 15));
             createImpactSparks(this.pos.x, this.pos.y, blinkDir.heading() + PI, "#0ff", 10);
             return;
         }
 
-        if (c.id === "turret") {
-            deployables.push(new Deployable(this.pos.x, this.pos.y, "TURRET"));
-            particles.push(new Shockwave(this.pos.x, this.pos.y, 40, "#aa0"));
+        if (c.id.includes("turret")) {
+            let spawnPos = p5.Vector.add(this.pos, p5.Vector.random2D().mult(random(40, 80)));
+            spawnPos.x = constrain(spawnPos.x, 50, WORLD_W - 50);
+            spawnPos.y = constrain(spawnPos.y, 50, WORLD_H - 50);
+            
+            let typeName = c.id.toUpperCase(); 
+            deployables.push(new Deployable(spawnPos.x, spawnPos.y, typeName));
+            particles.push(new Shockwave(spawnPos.x, spawnPos.y, 40, c.color));
             return;
         }
+
         if (c.id === "black_hole") {
             let target = this.getClosestEnemy();
             let spawnX = target ? target.pos.x : this.pos.x + random(-100,100);
@@ -524,9 +526,9 @@ class Player {
         } 
         else if (c.style === "AOE") {
             particles.push(new Shockwave(this.pos.x, this.pos.y, c.range, c.color));
-            if(c.id === "cleave" || c.id === "vortex" || c.id === "repel" || c.id === "shadow_bind" || c.id === "alchemy") particles.push(new SlashEffect(this.pos.x, this.pos.y, c.color, c.range, true));
+            if(c.id === "cleave" || c.id === "vortex" || c.id === "repel" || c.id === "shadow_bind" || c.id === "alchemy" || c.id === "venom_whip") particles.push(new SlashEffect(this.pos.x, this.pos.y, c.color, c.range, true));
             
-            if (c.id === "roar") { 
+            if (c.id === "roar" || c.id === "pandemic") { 
                 particles.push(new Shockwave(this.pos.x, this.pos.y, c.range * 1.5, "#fff")); 
             }
 
@@ -535,8 +537,11 @@ class Player {
             for(let e of enemies) {
                 if(dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < c.range) {
                     if(c.id === "poison") {
-                        e.applyDebuff("POISON", finalVal, 240);
+                        e.applyDebuff("POISON", finalVal, 240 * poisonDurMult);
                         particles.push(new TextParticle(e.pos.x, e.pos.y, "POISON", c.color));
+                    } else if (c.id === "toxic_mist") {
+                        e.applyDebuff("POISON", finalVal, 300 * poisonDurMult);
+                        particles.push(new TextParticle(e.pos.x, e.pos.y, "MIST", c.color));
                     } else if (c.id === "repel") {
                         e.takeDamage(finalVal, c);
                         e.applyDebuff("SLOW", 0, 240);
@@ -549,10 +554,27 @@ class Player {
                         e.takeDamage(finalVal, c); 
                         particles.push(new TextParticle(e.pos.x, e.pos.y, "MIST", c.color));
                     } else {
-                        e.takeDamage(finalVal, c);
+                        let currentVal = finalVal;
+                        if(c.id === "venom_whip" && e.poisonTimer > 0) {
+                            currentVal = Math.floor(finalVal * 3.0);
+                            particles.push(new TextParticle(e.pos.x, e.pos.y, "CRIT!", "#f0f"));
+                        }
+                        if(c.id === "pandemic" && e.poisonTimer > 0) {
+                            currentVal = Math.floor(finalVal * 2.0);
+                            particles.push(new TextParticle(e.pos.x, e.pos.y, "DOOM", "#f0f"));
+                        }
+
+                        e.takeDamage(currentVal, c);
                         createImpactSparks(e.pos.x, e.pos.y, p5.Vector.sub(e.pos, this.pos).heading(), c.color, 5);
+                        
+                        if(random() < 0.2 && equipment.some(eq => eq.id === "e_injector")) {
+                            e.applyDebuff("POISON", 5, 180 * poisonDurMult);
+                            particles.push(new TextParticle(e.pos.x, e.pos.y, "INJECT", "#0f0"));
+                        }
+
                         let pushForce = 25; 
                         if(c.id === "cleave") pushForce = 40;
+                        if(c.id === "venom_whip") pushForce = 40;
                         if(c.id === "gravity" || c.id === "vortex") pushForce = -30; 
                         if(c.id === "stomp") pushForce = 70;
                         if(c.id === "hammer") pushForce = 120; 
@@ -566,10 +588,11 @@ class Player {
             }
         } 
         else if (this.target) {
-            if (c.system === "Melee") {
+            if (c.system === "Melee" || (c.system === "Magic" && c.style === "MELEE")) {
                 if (c.id === "assassin" && !isMultiHit) {
                     let offset = p5.Vector.sub(this.pos, this.target.pos).normalize().mult(30); 
                     this.pos = p5.Vector.add(this.target.pos, offset);
+                    this.constrainPosition(); // Assassin constraint
                     particles.push(new AfterImage(this.pos.x, this.pos.y, 30, "#505", 15));
                     addShake(5);
                 }
@@ -597,7 +620,7 @@ class Player {
                 } else if (c.id === "pile_bunker") {
                     particles.push(new StabEffect(this.pos.x, this.pos.y, angle, c.color, 180));
                     particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 60, c.color));
-                } else if (c.id === "martial_arts") {
+                } else if (c.id === "martial_arts" || c.id === "bane_bolt") {
                     particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 40, false, angle));
                 } else {
                     particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 70, false, angle));
@@ -611,6 +634,12 @@ class Player {
                 for(let e of enemies) {
                     if(dist(this.target.pos.x, this.target.pos.y, e.pos.x, e.pos.y) < splashRange) {
                          e.takeDamage(finalVal, c);
+                         
+                         if(random() < 0.2 && equipment.some(eq => eq.id === "e_injector")) {
+                             e.applyDebuff("POISON", 5, 180 * poisonDurMult);
+                             particles.push(new TextParticle(e.pos.x, e.pos.y, "INJECT", "#0f0"));
+                         }
+
                          if(c.id === "scythe" && e === this.target) { this.heal(5); particles.push(new TextParticle(this.pos.x, this.pos.y-10, "DRAIN", "#f00")); }
                          if(c.id === "shield_bash" && e === this.target) { this.defBuffTimer = 120; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "DEF UP", "#00f")); }
                          let kb = 30; 
@@ -696,7 +725,6 @@ class Player {
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 12);
                     projectiles.push(p);
                 }
-                // --- 追加: スーパーボール (6方向) ---
                 else if (c.id === "super_ball") {
                     for (let i = 0; i < 6; i++) {
                         let spreadDir = dir.copy().rotate(i * (TWO_PI / 6));
@@ -704,7 +732,6 @@ class Player {
                         projectiles.push(p);
                     }
                 }
-                // ---------------------------------
                 else if (c.id === "homing_missile") {
                     for(let i=0; i<4; i++) {
                         let randTarget = enemies.length > 0 ? random(enemies) : null;
@@ -717,6 +744,14 @@ class Player {
                 else if (c.id === "intercept") {
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 25);
                     p.life = 15; 
+                    projectiles.push(p);
+                }
+                else if (c.id === "poison_flask") {
+                    let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 18);
+                    projectiles.push(p);
+                }
+                else if (c.id === "toxic_mist") {
+                    let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 20);
                     projectiles.push(p);
                 }
                 else {
@@ -732,7 +767,6 @@ class Player {
 
     nextCardIndex() { this.deckIndex = (this.deckIndex + 1) % deck.length; this.state = "IDLE"; }
     
-    // takeDamage, heal, getClosestEnemy, getFarthestEnemy, getClosestDrop, draw は変更なし
     takeDamage(amt, attacker) { 
         if (this.state === "LOOTING") {
             this.state = "IDLE";
@@ -771,6 +805,16 @@ class Player {
         }
         for(let e of equipment) if(e.id === "e_ghost" && random() < 0.15) {
              particles.push(new TextParticle(this.pos.x, this.pos.y-10, "MISS", "#ccc")); return;
+        }
+
+        if (this.activeMoveCard && this.activeMoveCard.id === "move_phase" && this.phaseTimer <= 0) {
+             let evadeDir = p5.Vector.sub(this.pos, attacker ? attacker.pos : this.pos).normalize();
+             if (evadeDir.mag() === 0) evadeDir = p5.Vector.random2D();
+             this.pos.add(evadeDir.mult(100));
+             this.constrainPosition(); // Phase warp constraint
+             this.phaseTimer = 300; // 5秒クールダウン
+             particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#a0f", 15));
+             particles.push(new TextParticle(this.pos.x, this.pos.y-20, "PHASE", "#a0f"));
         }
 
         if(this.activeMoveCard && this.activeMoveCard.id === "move_reflect" && this.state === "MOVING") {
@@ -860,7 +904,11 @@ class Player {
             else if (this.activeMoveCard.id === "move_barrage") { drawingContext.setLineDash([2, 2]); circle(0,0,35); drawingContext.setLineDash([]); }
             else if (this.activeMoveCard.id === "move_phase") { 
                 drawingContext.setLineDash([15, 5]); circle(0,0, 35); drawingContext.setLineDash([]);
-                if(this.phaseTimer > 0) { noStroke(); fill(160,0,255,100); circle(0,0,35 * (this.phaseTimer/60)); }
+                if(this.phaseTimer > 0) { noStroke(); fill(100,0,0,100); arc(0,0,35,35, -HALF_PI, -HALF_PI + (this.phaseTimer/300)*TWO_PI); }
+            }
+            else if (this.activeMoveCard.id === "move_sonic") {
+                noFill(); stroke("#2f8");
+                circle(0,0, 30 + sin(frameCount*0.5)*5);
             }
             else { circle(0,0,35); }
         }
