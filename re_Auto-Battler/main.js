@@ -29,13 +29,11 @@ function draw() {
         let targetX = player.pos.x - width/2;
         let targetY = player.pos.y - (height - UI_HEIGHT)/2;
         
-        // カメラ座標のNaN（非数）落ち防止
         if (!isNaN(targetX) && !isNaN(targetY) && isFinite(targetX) && isFinite(targetY)) {
             camX = lerp(camX, targetX, 0.08);
             camY = lerp(camY, targetY, 0.08);
         }
 
-        // 万が一 camX/camY が壊れていた場合の緊急リセット
         if (isNaN(camX) || isNaN(camY) || !isFinite(camX) || !isFinite(camY)) {
             camX = WORLD_W/2 - width/2;
             camY = WORLD_H/2 - height/2;
@@ -308,7 +306,7 @@ function updateGame() {
     updateEnemies();
     updateDeployables();
     updateProjectiles(projectiles, enemies, true);
-    updateProjectiles(enemyProjectiles, [player], false); // タレット削除に伴いターゲットをプレイヤーのみに
+    updateProjectiles(enemyProjectiles, [player], false);
     updateDrops();
     updatePuddles();
     
@@ -350,6 +348,29 @@ function updateEnemies() {
                 spProgress = 0;
                 killsForNextSp = min(20, killsForNextSp + 1); 
             }
+            
+            // --- 変更: 指名手配の継承（最も近い敵へ） ---
+            if (e.isWanted) {
+                let candidates = enemies.filter(en => !en.dead && en !== e);
+                if (candidates.length > 0) {
+                    // プレイヤーに最も近い敵を探す
+                    let nearest = null;
+                    let minDist = 99999;
+                    for(let cand of candidates) {
+                        let d = dist(player.pos.x, player.pos.y, cand.pos.x, cand.pos.y);
+                        if(d < minDist) {
+                            minDist = d;
+                            nearest = cand;
+                        }
+                    }
+                    
+                    if(nearest) {
+                        nearest.isWanted = true;
+                        particles.push(new TextParticle(nearest.pos.x, nearest.pos.y - 60, "WANTED!", "#f00", 60));
+                    }
+                }
+            }
+            // ---------------------------
 
             if (e.type === "MERCHANT") {
                 particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
@@ -480,7 +501,7 @@ function spawnEnemyGroup() {
     for(let g=0; g<groupCount; g++) {
         let count = 1;
         
-        // --- 出現ロジック (タレット削除の影響なし) ---
+        // --- 出現ロジック ---
         if (wave >= 15 && random() < 0.15) {
             type = random(["LANTERN_RED", "LANTERN_PURPLE", "LANTERN_YELLOW"]);
             count = 1;
@@ -578,7 +599,38 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     }
                     
                     if (isPlayerOwner) {
-                         t.takeDamage(p.val, p.card);
+                         // --- 指名手配（WANTED）シナジー処理 ---
+                         if (p.card.id === "wanted_poster") {
+                             for(let other of enemies) other.isWanted = false; // 一人だけ
+                             t.isWanted = true;
+                             particles.push(new TextParticle(t.pos.x, t.pos.y - 60, "WANTED!", "#f00", 60));
+                         }
+                         
+                         let dmg = p.val;
+                         if (t.isWanted) {
+                             if (p.card.id === "revolver") {
+                                 dmg = Math.floor(dmg * 2);
+                                 particles.push(new TextParticle(t.pos.x, t.pos.y, "CRIT!", "#ff0"));
+                             }
+                             else if (p.card.id === "deputy_shotgun") {
+                                 dmg = Math.floor(dmg * 1.5);
+                                 particles.push(new TextParticle(t.pos.x, t.pos.y, "SHOT!", "#fa0"));
+                             }
+                             else if (p.card.id === "execution") {
+                                 dmg = Math.floor(dmg * 2);
+                                 addShake(10);
+                                 particles.push(new TextParticle(t.pos.x, t.pos.y, "EXECUTE", "#f00", 50));
+                             }
+                         }
+
+                         if (p.card.id === "lasso") {
+                             let pull = p5.Vector.sub(player.pos, t.pos).setMag(150);
+                             t.pos.add(pull);
+                             particles.push(new TextParticle(t.pos.x, t.pos.y, "PULL!", "#fff"));
+                         }
+                         // ------------------------------------
+
+                         t.takeDamage(dmg, p.card);
                          
                          if (t.eliteTrait === "VOID") {
                              p.dead = true;
@@ -654,7 +706,7 @@ function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
     particles.push(new AfterImage(x, y, range * 0.8, "#fff", 5)); 
 
     if(dmg > 0) {
-        let targets = isPlayerOwner ? enemies : [player]; // タレット削除
+        let targets = isPlayerOwner ? enemies : [player]; 
         for(let t of targets) {
             if(dist(x, y, t.pos.x, t.pos.y) < range) {
                 t.takeDamage(dmg, {tag:"EXPLOSION"});
@@ -735,7 +787,6 @@ function keyPressed() {
 
 function startGame() {
     if(playerClass === "WARRIOR") deck = [getCardById("slash"), getCardById("hammer"), getCardById("charge")];
-    // --- 変更: RANGER初期装備のTURRETをSHOTGUNへ変更 ---
     else if(playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("shotgun")];
     else if(playerClass === "MAGE") deck = [getCardById("flame"), getCardById("cleave"), getCardById("beam")];
     else deck = [getCardById("slash"), getCardById("bow"), getCardById("heal")];
