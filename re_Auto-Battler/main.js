@@ -308,7 +308,7 @@ function updateGame() {
     updateEnemies();
     updateDeployables();
     updateProjectiles(projectiles, enemies, true);
-    updateProjectiles(enemyProjectiles, [player, ...deployables.filter(d=>d.type==="TURRET")], false);
+    updateProjectiles(enemyProjectiles, [player], false); // タレット削除に伴いターゲットをプレイヤーのみに
     updateDrops();
     updatePuddles();
     
@@ -322,7 +322,6 @@ function updateDeployables() {
     for (let i = deployables.length - 1; i >= 0; i--) {
         deployables[i].update();
         if (deployables[i].dead) {
-             if(deployables[i].type === "TURRET") particles.push(new ExplosionEffect(deployables[i].pos.x, deployables[i].pos.y, "#aa0", 5));
              deployables.splice(i, 1);
         }
     }
@@ -349,7 +348,6 @@ function updateEnemies() {
                 player.sp++;
                 gameState = "SKILL_TREE";
                 spProgress = 0;
-                // --- 変更: スキルポイント獲得必要数の上限を20に増加 ---
                 killsForNextSp = min(20, killsForNextSp + 1); 
             }
 
@@ -481,8 +479,16 @@ function spawnEnemyGroup() {
 
     for(let g=0; g<groupCount; g++) {
         let count = 1;
-        // --- 変更: 新しい敵の出現ロジックを追加 ---
-        if (wave >= 15 && random() < 0.15) { type = "COMMANDER"; count = 1; }
+        
+        // --- 出現ロジック (タレット削除の影響なし) ---
+        if (wave >= 15 && random() < 0.15) {
+            type = random(["LANTERN_RED", "LANTERN_PURPLE", "LANTERN_YELLOW"]);
+            count = 1;
+        }
+        else if (wave >= 12 && random() < 0.20) { 
+            type = "KAMIKAZE";
+            count = 3; 
+        }
         else if (wave >= 10 && random() < 0.2) { type = "SNIPER"; count = 1; }
         else if (wave >= 6 && random() < 0.2) { type = "PHALANX_TRIO"; count = 1; }
         else if (wave >= 10 && r > 0.7) {
@@ -574,14 +580,11 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     if (isPlayerOwner) {
                          t.takeDamage(p.val, p.card);
                          
-                         // --- 追加: 特性「VOID」による弾の消滅 ---
                          if (t.eliteTrait === "VOID") {
                              p.dead = true;
                              particles.push(new TextParticle(p.pos.x, p.pos.y, "VOID", "#f0f"));
-                             // 貫通属性を持っていても強制的に消滅
                              break;
                          }
-                         // ------------------------------------
 
                          if (t.type === "GUARD") {
                              p.dead = true;
@@ -651,19 +654,16 @@ function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
     particles.push(new AfterImage(x, y, range * 0.8, "#fff", 5)); 
 
     if(dmg > 0) {
-        let targets = isPlayerOwner ? enemies : [player, ...deployables.filter(d=>d.type==="TURRET")];
+        let targets = isPlayerOwner ? enemies : [player]; // タレット削除
         for(let t of targets) {
             if(dist(x, y, t.pos.x, t.pos.y) < range) {
                 t.takeDamage(dmg, {tag:"EXPLOSION"});
                 
-                // --- 追加: 爆発もノックバックの一種としてIRON特性を考慮 ---
                 if (t instanceof Enemy && t.eliteTrait === "IRON") {
-                    // ノックバックさせない
                 } else {
                     let push = p5.Vector.sub(t.pos, createVector(x,y)).setMag(20);
                     t.pos.add(push);
                 }
-                // ----------------------------------------------------
             }
         }
     }
@@ -735,7 +735,8 @@ function keyPressed() {
 
 function startGame() {
     if(playerClass === "WARRIOR") deck = [getCardById("slash"), getCardById("hammer"), getCardById("charge")];
-    else if(playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("turret")];
+    // --- 変更: RANGER初期装備のTURRETをSHOTGUNへ変更 ---
+    else if(playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("shotgun")];
     else if(playerClass === "MAGE") deck = [getCardById("flame"), getCardById("cleave"), getCardById("beam")];
     else deck = [getCardById("slash"), getCardById("bow"), getCardById("heal")];
 
