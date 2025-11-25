@@ -32,20 +32,12 @@ function initLibraries() {
         A("venom_whip", "ベノムウィップ", "Magic", "AOE", "ATK", 150, 20, 20, 120, "RARE", "前方を一掃。毒の敵に威力3倍。"),
         A("pandemic", "パンデミック", "Magic", "AOE", "ATK", 300, 50, 60, 480, "LEGENDARY", "広範囲攻撃。毒の敵には2倍ダメージ。"),
 
-        // --- 遠距離設置物シナジーカード (6種) ---
-        {...A("sniper_turret", "スナイパータレット", "Ranged", "SUMMON", "ALLY", 0, 40, 20, 720, "RARE", "超長射程・高威力の狙撃タレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        {...A("laser_turret", "レーザータレット", "Ranged", "SUMMON", "ALLY", 0, 15, 20, 720, "RARE", "貫通するレーザーを放つタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        {...A("gatling_turret", "ガトリングタレット", "Ranged", "SUMMON", "ALLY", 0, 4, 20, 600, "COMMON", "高速連射を行うタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        {...A("missile_turret", "ミサイルタレット", "Ranged", "SUMMON", "ALLY", 0, 25, 20, 800, "LEGENDARY", "追尾ミサイルを発射するタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        {...A("arc_turret", "アークタレット", "Ranged", "SUMMON", "ALLY", 0, 12, 20, 600, "RARE", "範囲内の敵に電撃を放つタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        {...A("flame_turret", "フレイムタレット", "Ranged", "SUMMON", "ALLY", 0, 6, 20, 600, "COMMON", "周囲に炎を撒き散らすタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-
-        // --- 既存カード ---
+        // --- 既存カード (タレット系削除済み) ---
         A("super_ball", "スーパーボール", "Ranged", "RANGE", "PROJECTILE", 300, 25, 300, 480, "LEGENDARY", "6方向に発射。壁と敵で跳ね返る。"),
         A("gear", "ギア", "Ranged", "RANGE", "PROJECTILE", 999, 25, 120, 240, "RARE", "画面端で5回跳ねる貫通弾。"),
         A("homing_missile", "ミサイル", "Ranged", "RANGE", "PROJECTILE", 600, 18, 60, 300, "RARE", "敵を追尾する弾を複数発射。"),
         A("intercept", "迎撃", "Ranged", "RANGE", "ATK", 50, 80, 10, 480, "COMMON", "至近距離への超高威力射撃。"),
-        A("spear_flurry", "槍撃乱舞", "Melee", "MELEE", "ATK", 150, 25, 60, 300, "LEGENDARY", "前方に高速の連続突きを繰り出す。"),
+        A("spear_flurry", "槍撃乱舞", "Melee", "MELEE", "ATK", 150, 25, 60, 300, "LEGENDARY", "前方を高速の連続突きを繰り出す。"),
         A("martial_arts", "格闘術", "Melee", "MELEE", "ATK", 60, 15, 10, 30, "COMMON", "隙の少ない超高速連打。"),
         A("roar", "咆哮", "Melee", "AOE", "ATK", 200, 5, 40, 300, "RARE", "周囲の敵を大きく吹き飛ばす。"),
         A("pile_bunker", "パイルバンカー", "Melee", "MELEE", "ATK", 50, 40, 40, 360, "RARE", "至近単体に威力40＆強撃退。"),
@@ -64,7 +56,6 @@ function initLibraries() {
         A("giga_laser", "ギガレーザー", "Magic", "RANGE", "PROJECTILE", 400, 40, 60, 500, "RARE", "極太の貫通レーザーを放つ。"),
         A("orbit_fire", "オービット", "Magic", "SELF", "BUFF", 150, 14, 0, 600, "RARE", "周囲を回る火の玉を展開。"),
         A("assassin", "暗殺", "Melee", "MELEE", "ATK", 300, 42, 30, 480, "LEGENDARY", "最遠敵の背後へワープ攻撃。"), 
-        {...A("turret", "タレット", "Ranged", "SUMMON", "ALLY", 0, 0, 20, 600, "RARE", "自動射撃を行う砲台を設置。"), color: SYSTEM_COLORS["Turret"]},
         A("poison", "ポイズン", "Magic", "AOE", "DOT", 150, 0, 40, 300, "RARE", "広範囲を毒状態にする。"),
         A("repel", "拒絶", "Magic", "AOE", "DEBUFF", 160, 10, 20, 420, "COMMON", "弾き飛ばし＆スロウ付与。"),
         A("slash", "斬撃", "Melee", "MELEE", "ATK", 50, 21, 20, 60, "COMMON", "前方を薙ぎ払う基本攻撃。"), 
@@ -104,7 +95,7 @@ function initLibraries() {
         A("heal", "ヒール", "Heal", "SELF", "HEAL", 0, 28, 40, 600, "LEGENDARY", "自身のHPを回復する。"),
     ];
 
-    // --- EQUIPMENT LIBRARY ---
+    // --- EQUIPMENT LIBRARY (タレット強化削除済み) ---
     equipLibrary = [
         E("e_swd", "鉄の剣", {melee:0.20}, "#e66", "近接ダメージ+20%"),
         E("e_bow", "ロングボウ", {range:0.20}, "#6e6", "遠距離ダメージ+20%"),
@@ -117,12 +108,6 @@ function initLibraries() {
         E("e_wand", "魔法の杖", {magic: 0.20}, "#c6f", "魔法ダメージ+20%"),
         E("e_scope", "スナイパースコープ", {rangeAdd: 0.20}, "#484", "攻撃射程+20%"),
         
-        // --- タレット強化装備 (3種) ---
-        E("e_wrench", "整備士のレンチ", {turretDuration: 0.5}, "#fa0", "タレット持続時間+50%"),
-        E("e_lens", "増幅レンズ", {turretRange: 0.3}, "#0ff", "タレット射程+30%"),
-        E("e_overclock", "オーバークロックギア", {turretSpeed: 0.2}, "#f44", "タレット攻撃頻度+20%"),
-        // ---------------------------
-
         E("e_plague", "疫病の仮面", {poisonDuration: 0.5}, "#0a0", "毒の効果時間+50%"),
         E("e_injector", "毒の刃", {poisonChance: 0.2}, "#808", "攻撃時20%で毒を付与"),
         E("e_absorb", "ポイズンイーター", {}, "#80a", "敵が毒ダメージを受ける度HP3回復"),
