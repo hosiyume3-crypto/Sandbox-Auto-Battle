@@ -11,17 +11,23 @@ class Deployable {
         } else if (type === "TOXIC_MIST") {
             this.life = 300; this.range = 150;
         } else if (type === "SNIPER_TURRET") {
-            this.life = 720; this.range = 800; this.maxTimer = 120; // 2秒に1発
+            // 持続7秒(420F), 攻撃間隔を遅く(160F:約2.7秒)
+            this.life = 420; this.range = 800; this.maxTimer = 160; 
         } else if (type === "LASER_TURRET") {
-            this.life = 720; this.range = 500; this.maxTimer = 90; // 1.5秒に1発
+            // 持続6秒(360F)
+            this.life = 360; this.range = 500; this.maxTimer = 90; 
         } else if (type === "GATLING_TURRET") {
-            this.life = 600; this.range = 350; this.maxTimer = 10; // 秒間6発
+            // 持続5秒(300F)
+            this.life = 300; this.range = 350; this.maxTimer = 10; 
         } else if (type === "MISSILE_TURRET") {
-            this.life = 800; this.range = 600; this.maxTimer = 150; // 2.5秒に1発
+            // 持続8秒(480F)
+            this.life = 480; this.range = 600; this.maxTimer = 150; 
         } else if (type === "ARC_TURRET") {
-            this.life = 600; this.range = 250; this.maxTimer = 60; // 1秒に1発
+            // 持続6秒(360F)
+            this.life = 360; this.range = 250; this.maxTimer = 60; 
         } else if (type === "FLAME_TURRET") {
-            this.life = 600; this.range = 200; this.maxTimer = 5; // 超高速連射
+            // 持続7秒(420F)
+            this.life = 420; this.range = 200; this.maxTimer = 5; 
         } else {
             // 通常タレット
             this.life = 480; this.range = 300; this.maxTimer = 30;
@@ -99,7 +105,8 @@ class Deployable {
                     if (this.type === "TURRET") {
                         card.color = "#aa0"; dmg = 15; pSpeed = 10;
                     } else if (this.type === "SNIPER_TURRET") {
-                        card.color = "#f00"; card.id = "sniper_shot"; dmg = 40; pSpeed = 30; pLife = 40;
+                        // 攻撃力35
+                        card.color = "#f00"; card.id = "sniper_shot"; dmg = 35; pSpeed = 30; pLife = 40;
                         card.piercing = true; 
                     } else if (this.type === "LASER_TURRET") {
                         card.color = "#0ff"; card.id = "beam"; dmg = 15; pSpeed = 25; pLife = 30;
