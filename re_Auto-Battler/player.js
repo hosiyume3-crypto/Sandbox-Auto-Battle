@@ -74,10 +74,7 @@ class Player {
         if(type === "POISON") { this.status.poison = duration; particles.push(new TextParticle(this.pos.x, this.pos.y-20, "POISON", "#0f0")); }
     }
 
-    // --- 追加: 座標の安全化処理 ---
-    // 座標が壊れた(NaN)場合に復帰させ、画面外に出ないように制限する
     constrainPosition() {
-        // 座標が非数(NaN)または無限大(Infinity)になっていたら中央にリセット
         if (isNaN(this.pos.x) || isNaN(this.pos.y) || !isFinite(this.pos.x) || !isFinite(this.pos.y)) {
             this.pos.set(WORLD_W/2, WORLD_H/2);
         }
@@ -86,7 +83,6 @@ class Player {
         this.pos.x = constrain(this.pos.x, margin, WORLD_W - margin);
         this.pos.y = constrain(this.pos.y, margin, WORLD_H - margin);
     }
-    // ---------------------------
 
     update() {
         this.maxHp = 200 + this.upgrades.hp * 20 + this.getStat("hpAdd");
@@ -163,11 +159,9 @@ class Player {
                             this.takeDamage(collisionDmg, e);
                             
                             if (e.type !== "P_TANK") {
-                                // --- 修正: 0距離接触時のエラー回避 ---
                                 let pushDir = p5.Vector.sub(this.pos, e.pos);
-                                if (pushDir.magSq() === 0) pushDir = p5.Vector.random2D(); // 完全に重なっていたらランダム
+                                if (pushDir.magSq() === 0) pushDir = p5.Vector.random2D(); 
                                 this.pos.add(pushDir.setMag(10));
-                                // --------------------------------
                             }
                             
                             for(let eq of equipment) { if(eq.id === "e_thorns") e.takeDamage(10); }
@@ -249,7 +243,7 @@ class Player {
                 if (this.currentCard.id === "gatotsu" && this.target) {
                     let dashDir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                     this.pos.add(dashDir.mult(40)); 
-                    this.constrainPosition(); // 移動後の安全確認
+                    this.constrainPosition(); 
                     particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#f00", 5));
                 }
             }
@@ -270,7 +264,6 @@ class Player {
              if (deck.some(c => c.category === "ACTION" && c.currentCooldown <= 0)) this.state = "IDLE";
         }
         
-        // --- 最終的な座標チェック ---
         this.constrainPosition();
     }
 
@@ -293,7 +286,7 @@ class Player {
 
     processCardLogic(card) {
         if (card.id === "counter") { this.performAction(); return; }
-        if (card.system === "Heal" || card.id === "teleport" || card.id.includes("turret") || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
+        if (card.system === "Heal" || card.id === "teleport" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
         
         let targetEnemy;
         if (card.id === "assassin" || card.id === "gatotsu") targetEnemy = this.getFarthestEnemy();
@@ -451,17 +444,6 @@ class Player {
             this.constrainPosition(); // Teleport constraint
             particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#0ff", 15));
             createImpactSparks(this.pos.x, this.pos.y, blinkDir.heading() + PI, "#0ff", 10);
-            return;
-        }
-
-        if (c.id.includes("turret")) {
-            let spawnPos = p5.Vector.add(this.pos, p5.Vector.random2D().mult(random(40, 80)));
-            spawnPos.x = constrain(spawnPos.x, 50, WORLD_W - 50);
-            spawnPos.y = constrain(spawnPos.y, 50, WORLD_H - 50);
-            
-            let typeName = c.id.toUpperCase(); 
-            deployables.push(new Deployable(spawnPos.x, spawnPos.y, typeName));
-            particles.push(new Shockwave(spawnPos.x, spawnPos.y, 40, c.color));
             return;
         }
 
