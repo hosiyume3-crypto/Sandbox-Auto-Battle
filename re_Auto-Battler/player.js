@@ -240,6 +240,9 @@ class Player {
                 if (this.currentCard.id === "barrage" && this.timer % 15 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "flamethrower" && this.timer % 3 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "fan_laser" && this.timer % 4 === 0 && this.timer > 0) this.performAction(true);
+                // リボルバー連射処理
+                if (this.currentCard.id === "revolver" && this.timer % 6 === 0 && this.timer > 0) this.performAction(true);
+                
                 if (this.currentCard.id === "gatotsu" && this.target) {
                     let dashDir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                     this.pos.add(dashDir.mult(40)); 
@@ -251,7 +254,8 @@ class Player {
             if (this.timer <= 0) {
                 if(this.currentCard) {
                     let mult = this.getStat("cdMult"); 
-                    this.currentCard.currentCooldown = Math.floor(this.currentCard.cooldownMax * mult);
+                    let cd = Math.floor(this.currentCard.cooldownMax * mult);
+                    this.currentCard.currentCooldown = cd;
                 }
                 this.nextCardIndex();
             }
@@ -289,13 +293,39 @@ class Player {
         if (card.system === "Heal" || card.id === "teleport" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
         
         let targetEnemy;
-        if (card.id === "assassin" || card.id === "gatotsu") targetEnemy = this.getFarthestEnemy();
+        
+        // --- 指名手配（WANTED）ターゲット優先ロジック ---
+        let wanted = enemies.find(e => e.isWanted && !e.dead);
+        if (wanted) {
+            targetEnemy = wanted;
+        }
+        // ----------------------------------------------
+        else if (card.id === "assassin" || card.id === "gatotsu") targetEnemy = this.getFarthestEnemy();
         else targetEnemy = this.getClosestEnemy();
 
         if (!targetEnemy) { 
             this.state = "IDLE";
             return; 
         }
+        
+        // --- 条件による発動スキップ処理 ---
+        
+        // 投げ縄: 指名手配の敵が居ない場合は発動しない
+        if (card.id === "lasso" && !targetEnemy.isWanted) {
+            this.deckIndex = (this.deckIndex + 1) % deck.length;
+            this.state = "IDLE";
+            uiParticles.push(new UIParticle(player.pos.x, player.pos.y - 30, "No Wanted", "#888", 30));
+            return;
+        }
+        
+        // 指名手配書: 既に指名手配の敵が居る場合は発動しない
+        if (card.id === "wanted_poster" && wanted) {
+            this.deckIndex = (this.deckIndex + 1) % deck.length;
+            this.state = "IDLE";
+            uiParticles.push(new UIParticle(player.pos.x, player.pos.y - 30, "Already Wanted", "#888", 30));
+            return;
+        }
+        // ----------------------------------------
         
         if (card.id === "intercept") {
             let distToTarget = dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y);
@@ -714,6 +744,38 @@ class Player {
                         projectiles.push(p);
                     }
                 }
+                // --- 指名手配系カードのプロジェクタイル生成 (変更) ---
+                else if (c.id === "revolver") {
+                    // 変更: 単発発射 (updateで連射)
+                    let spreadDir = dir.copy().rotate(random(-0.05, 0.05));
+                    projectiles.push(new Projectile(this.pos.x, this.pos.y, spreadDir, c, finalVal, 25));
+                    addShake(1);
+                }
+                else if (c.id === "deputy_shotgun") {
+                    // 扇状に5発
+                    for(let i=0; i<5; i++) {
+                        let spreadDir = dir.copy().rotate(map(i, 0, 4, -0.3, 0.3));
+                        projectiles.push(new Projectile(this.pos.x, this.pos.y, spreadDir, c, finalVal, 18));
+                    }
+                    addShake(4);
+                }
+                else if (c.id === "desert_eagle") {
+                    // 高速単発
+                    projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 35));
+                    addShake(5);
+                }
+                else if (c.id === "wanted_poster") {
+                    projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 20));
+                }
+                else if (c.id === "lasso") {
+                    projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 15));
+                }
+                else if (c.id === "execution") {
+                    projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 25));
+                    addShake(6);
+                }
+                // ------------------------------------------
+
                 else if (c.id === "homing_missile") {
                     for(let i=0; i<4; i++) {
                         let randTarget = enemies.length > 0 ? random(enemies) : null;
@@ -818,6 +880,13 @@ class Player {
         if(this.defBuffTimer > 0) reduction += 0.5;
         
         reduction += this.upgrades.def * 0.05; 
+        
+        // --- 手錠効果 ---
+        if (attacker && attacker.isWanted && equipment.some(e => e.id === "handcuffs")) {
+            reduction += 0.3; // 30%軽減
+            if (frameCount % 30 === 0) particles.push(new TextParticle(this.pos.x, this.pos.y - 15, "GUARD", "#ccc"));
+        }
+        // ----------------
 
         let finalDmg = Math.max(1, Math.floor(amt * (1.0 - Math.min(0.9, reduction))));
         this.hp -= finalDmg;
