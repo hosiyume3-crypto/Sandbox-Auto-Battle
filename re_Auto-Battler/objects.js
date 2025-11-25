@@ -10,26 +10,8 @@ class Deployable {
             this.life = 300; this.range = 400;
         } else if (type === "TOXIC_MIST") {
             this.life = 300; this.range = 150;
-        } else if (type === "SNIPER_TURRET") {
-            // 持続7秒(420F), 攻撃間隔を遅く(160F:約2.7秒)
-            this.life = 420; this.range = 800; this.maxTimer = 160; 
-        } else if (type === "LASER_TURRET") {
-            // 持続6秒(360F)
-            this.life = 360; this.range = 500; this.maxTimer = 90; 
-        } else if (type === "GATLING_TURRET") {
-            // 持続5秒(300F)
-            this.life = 300; this.range = 350; this.maxTimer = 10; 
-        } else if (type === "MISSILE_TURRET") {
-            // 持続8秒(480F)
-            this.life = 480; this.range = 600; this.maxTimer = 150; 
-        } else if (type === "ARC_TURRET") {
-            // 持続6秒(360F)
-            this.life = 360; this.range = 250; this.maxTimer = 60; 
-        } else if (type === "FLAME_TURRET") {
-            // 持続7秒(420F)
-            this.life = 420; this.range = 200; this.maxTimer = 5; 
         } else {
-            // 通常タレット
+            // 通常タレット (削除済みだが念のため残す)
             this.life = 480; this.range = 300; this.maxTimer = 30;
         }
         
@@ -70,71 +52,6 @@ class Deployable {
                     }
                 }
             }
-        } else if (this.type === "ARC_TURRET") {
-            // アークタレット: 範囲内の敵に即着弾攻撃
-            if (this.timer <= 0) {
-                let target = this.getClosestEnemy();
-                if (target) {
-                    let dmg = Math.floor(12 * dmgMult);
-                    target.takeDamage(dmg, {id:"arc_turret"});
-                    
-                    // 電撃エフェクト (線分をパーティクルで表現)
-                    let segments = 5;
-                    let curX = this.pos.x, curY = this.pos.y - 10;
-                    for(let i=0; i<segments; i++) {
-                        let nextX = lerp(curX, target.pos.x, (i+1)/segments) + random(-10,10);
-                        let nextY = lerp(curY, target.pos.y, (i+1)/segments) + random(-10,10);
-                        particles.push(new Spark((curX+nextX)/2, (curY+nextY)/2, "#0ff", random(TWO_PI), 0, 5));
-                        curX = nextX; curY = nextY;
-                    }
-                    particles.push(new Shockwave(target.pos.x, target.pos.y, 30, "#0ff"));
-                    this.timer = this.maxTimer;
-                }
-            }
-        } else {
-            // 射撃系タレット共通処理
-            if(this.timer <= 0) {
-                let target = this.getClosestEnemy();
-                if(target) {
-                    let dir = p5.Vector.sub(target.pos, this.pos).normalize();
-                    let pSpeed = 10;
-                    let pLife = 60;
-                    let card = { id:"turret_shot", tag:"PROJECTILE", style:"RANGE", range:this.range, color:"#aa0" };
-                    let dmg = 0;
-
-                    if (this.type === "TURRET") {
-                        card.color = "#aa0"; dmg = 15; pSpeed = 10;
-                    } else if (this.type === "SNIPER_TURRET") {
-                        // 攻撃力35
-                        card.color = "#f00"; card.id = "sniper_shot"; dmg = 35; pSpeed = 30; pLife = 40;
-                        card.piercing = true; 
-                    } else if (this.type === "LASER_TURRET") {
-                        card.color = "#0ff"; card.id = "beam"; dmg = 15; pSpeed = 25; pLife = 30;
-                        card.piercing = true; 
-                    } else if (this.type === "GATLING_TURRET") {
-                        card.color = "#fa0"; dmg = 4; pSpeed = 15; pLife = 40;
-                        dir.rotate(random(-0.1, 0.1));
-                    } else if (this.type === "MISSILE_TURRET") {
-                        card.color = "#f80"; card.id = "homing_missile"; dmg = 25; pSpeed = 8; pLife = 100;
-                    } else if (this.type === "FLAME_TURRET") {
-                        card.color = "#f40"; card.id = "flame"; dmg = 6; pSpeed = 7; pLife = 25;
-                        card.piercing = true;
-                        dir.rotate(random(-0.3, 0.3));
-                    }
-
-                    let finalDmg = Math.floor(dmg * dmgMult);
-                    
-                    let p = new Projectile(this.pos.x, this.pos.y - 10, dir, card, finalDmg, pSpeed);
-                    p.life = pLife;
-                    
-                    if (this.type === "MISSILE_TURRET") {
-                        p.homing = true; p.target = target;
-                    }
-
-                    projectiles.push(p);
-                    this.timer = this.maxTimer;
-                }
-            }
         }
     }
 
@@ -151,40 +68,7 @@ class Deployable {
         push(); translate(this.pos.x, this.pos.y);
         drawingContext.shadowBlur = 10;
         
-        if(this.type === "TURRET") {
-            drawingContext.shadowColor = "#ff0";
-            noStroke(); fill(150, 150, 0); rect(-10, -10, 20, 20);
-            fill(255, 255, 0); circle(0, -5, 10);
-        } else if (this.type === "SNIPER_TURRET") {
-            drawingContext.shadowColor = "#f00";
-            fill(50); rect(-12, -12, 24, 24);
-            fill(100); rect(-4, -20, 8, 20); // 長い砲身
-            fill(255, 0, 0); circle(0, -5, 6);
-        } else if (this.type === "LASER_TURRET") {
-            drawingContext.shadowColor = "#0ff";
-            fill(0, 100, 150); ellipse(0, 0, 24, 16);
-            fill(0, 255, 255); rect(-2, -15, 4, 15);
-            circle(0, -15, 8);
-        } else if (this.type === "GATLING_TURRET") {
-            drawingContext.shadowColor = "#fa0";
-            fill(100, 80, 0); rect(-10, -10, 20, 20);
-            fill(255, 150, 0); 
-            rect(-8, -15, 4, 10); rect(4, -15, 4, 10); rect(-2, -18, 4, 12);
-        } else if (this.type === "MISSILE_TURRET") {
-            drawingContext.shadowColor = "#f80";
-            fill(80); rect(-12, -8, 24, 16);
-            fill(255, 100, 0); rect(-10, -15, 6, 10); rect(4, -15, 6, 10);
-        } else if (this.type === "ARC_TURRET") {
-            drawingContext.shadowColor = "#0ff";
-            fill(50, 50, 100); circle(0, 0, 24);
-            noFill(); stroke(0, 255, 255); strokeWeight(2);
-            let r = 12 + sin(frameCount * 0.5) * 4;
-            circle(0, -10, r);
-        } else if (this.type === "FLAME_TURRET") {
-            drawingContext.shadowColor = "#f40";
-            fill(100, 50, 0); rect(-10, -10, 20, 20, 5);
-            fill(255, 50, 0); triangle(-5, -5, 5, -5, 0, -20);
-        } else if (this.type === "BLACK_HOLE") {
+        if (this.type === "BLACK_HOLE") {
             drawingContext.shadowBlur = 20; drawingContext.shadowColor = "#a0f";
             noStroke(); fill(0); circle(0,0,60);
             noFill(); stroke(100,0,255); strokeWeight(2); circle(0,0,70 + sin(frameCount*0.2)*10);
@@ -199,13 +83,6 @@ class Deployable {
                 circle(cos(a)*r, sin(a)*r, 10 + sin(frameCount*0.2+i)*5);
             }
         }
-        
-        // 範囲表示 (薄く)
-        if (this.type.includes("TURRET")) {
-             noFill(); stroke(255, 255, 255, 30); strokeWeight(1);
-             circle(0, 0, this.range * 2);
-        }
-
         pop();
     }
 }
@@ -259,13 +136,13 @@ class Projectile {
         
         this.bounceCount = card.bounce || 0;
         if (card.id === "gear") this.bounceCount = 5; 
-        if (card.id === "super_ball") this.bounceCount = 20; 
+        if (card.id === "super_ball") this.bounceCount = 5; // 5回反射
 
         if(card.id === "slow_sphere") this.life = 180; 
         if(card.id === "railgun") this.life = 10; 
         if(card.id === "gear") this.life = 180;
         if(card.id === "super_ball") this.life = 300; 
-        if(card.id === "homing_missile") { this.life = 120; this.homing = true; this.target = null; }
+        if(card.id === "homing_missile" || card.id === "tracking_rounds") { this.life = 120; this.homing = true; this.target = null; }
 
         this.isBoomerang = (card.id === "boomerang");
         this.returnTimer = 0; 
@@ -331,7 +208,7 @@ class Projectile {
         fill(this.color); noStroke(); 
         translate(this.pos.x, this.pos.y);
         
-        if(this.card.id === "beam" || this.card.id === "sniper" || this.card.id === "intercept" || this.card.id === "beam") { // Beam is duplicated but harmless
+        if(this.card.id === "beam" || this.card.id === "sniper" || this.card.id === "intercept") {
             rotate(this.vel.heading()); 
             rect(-15, -3, 30, 6); 
             fill(255); rect(-10,-1, 20,2); 
@@ -376,7 +253,7 @@ class Projectile {
             circle(0, 0, 18);
             fill(255, 200); circle(4, -4, 6);
         }
-        else if (this.card.id === "homing_missile") {
+        else if (this.card.id === "homing_missile" || this.card.id === "tracking_rounds") {
             rotate(this.vel.heading());
             fill(200, 100, 50); rect(-10, -4, 20, 8);
             fill(255, 0, 0); triangle(10, -4, 15, 0, 10, 4);
@@ -390,6 +267,13 @@ class Projectile {
         else if (this.card.id === "toxic_mist") {
             fill(150, 0, 150); circle(0,0,12);
             noFill(); stroke(200, 0, 200); circle(0,0,16);
+        }
+        else if (this.card.id === "throwing_knife") {
+            // --- ナイフの描画 ---
+            rotate(frameCount * 0.5);
+            fill(200); noStroke();
+            rect(-2, -8, 4, 16); // 刃
+            fill(100, 50, 0); rect(-2, 8, 4, 6); // 柄
         }
         else if(this.isBoomerang) { 
             rotate(frameCount * 0.5); 
@@ -406,6 +290,10 @@ class Projectile {
             rotate(this.vel.heading());
             fill(255, 255, 100);
             beginShape(); vertex(10,0); vertex(-5,5); vertex(-5,-5); endShape(CLOSE);
+        }
+        else if(this.card.id === "desert_eagle" || this.card.id === "revolver") {
+             fill(this.color);
+             rect(-4, -2, 8, 4);
         }
         else if(this.card.tag === "EXPLOSION") circle(0, 0, 14);
         else circle(0, 0, 10); 
