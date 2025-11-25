@@ -168,7 +168,6 @@ function drawLibrary() {
     
     let backW = 120, backH = 50;
     let backX = width - backW - 30;
-    
     // --- 変更: 位置を30px上に移動 (height - 70 -> height - 100) ---
     let backY = height - 100;
     // --------------------------------------------------------
@@ -421,8 +420,10 @@ function drawSkillTree() {
     textSize(16); fill(255,255,100); text(`SKILL POINTS: ${player.sp}`, width/2, 90);
     
     let skills = [
-        { name: "VITALITY", val: player.upgrades.hp, desc: "最大HP +25" },
-        { name: "STRENGTH", val: player.upgrades.atk, desc: "全ダメージ +15%" },
+        // --- 変更: 説明文を更新 ---
+        { name: "VITALITY", val: player.upgrades.hp, desc: "最大HP +20" },
+        { name: "STRENGTH", val: player.upgrades.atk, desc: "全ダメージ +12%" },
+        // ----------------------
         { name: "AGILITY", val: player.upgrades.spd, desc: "移動速度 +10%" },
         { name: "RANGE", val: player.upgrades.range, desc: "攻撃範囲 +10%" },
         { name: "LUCK", val: player.upgrades.luck, desc: "ドロップ率 +2.5%" },
