@@ -3,7 +3,9 @@
 // --- CONFIGURATION ---
 const MAX_DECK_SIZE = 9;
 const MAX_EQUIP_SIZE = 4;
-const CARD_CHOICES = 4;
+// --- 変更: 選択肢を5枚に ---
+const CARD_CHOICES = 5;
+// -------------------------
 const WORLD_W = 3000; 
 const WORLD_H = 3000;
 const VIEW_W = 800;
