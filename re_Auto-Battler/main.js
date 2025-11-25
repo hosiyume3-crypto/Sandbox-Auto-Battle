@@ -28,8 +28,18 @@ function draw() {
     if (player && gameState === "PLAY" && !isPaused) {
         let targetX = player.pos.x - width/2;
         let targetY = player.pos.y - (height - UI_HEIGHT)/2;
-        camX = lerp(camX, targetX, 0.08);
-        camY = lerp(camY, targetY, 0.08);
+        
+        // カメラ座標のNaN（非数）落ち防止
+        if (!isNaN(targetX) && !isNaN(targetY) && isFinite(targetX) && isFinite(targetY)) {
+            camX = lerp(camX, targetX, 0.08);
+            camY = lerp(camY, targetY, 0.08);
+        }
+
+        // 万が一 camX/camY が壊れていた場合の緊急リセット
+        if (isNaN(camX) || isNaN(camY) || !isFinite(camX) || !isFinite(camY)) {
+            camX = WORLD_W/2 - width/2;
+            camY = WORLD_H/2 - height/2;
+        }
         
         if(shakePower > 0) {
             camX += random(-shakePower, shakePower);
@@ -167,9 +177,7 @@ function mousePressed() {
         
         let backW = 120, backH = 50;
         let backX = width - backW - 30;
-        // --- 変更: 判定位置を修正 (height - 70 -> height - 100) ---
         let backY = height - 100;
-        // --------------------------------------------------------
         if(isMouseOver(backX, backY, backW, backH)) {
             gameState = "TITLE";
         }
@@ -289,12 +297,10 @@ function updateGame() {
     let baseSpawnRate = 360; 
     let reduction = wave * 10 + scaleFactor * 30;
     
-    // --- 変更: Wave 15以降は最大出現間隔を2秒(120F)まで短縮 ---
-    let maxReduction = (wave >= 15) ? 240 : 180; // 360 - 240 = 120(2s), 360 - 180 = 180(3s)
+    let maxReduction = (wave >= 15) ? 240 : 180; 
     if (reduction > maxReduction) reduction = maxReduction;
     
     let spawnRate = baseSpawnRate - reduction; 
-    // ----------------------------------------------------
 
     if (frameCount % spawnRate === 0) spawnEnemyGroup();
 
@@ -343,7 +349,8 @@ function updateEnemies() {
                 player.sp++;
                 gameState = "SKILL_TREE";
                 spProgress = 0;
-                killsForNextSp = min(15, killsForNextSp + 1); 
+                // --- 変更: スキルポイント獲得必要数の上限を20に増加 ---
+                killsForNextSp = min(20, killsForNextSp + 1); 
             }
 
             if (e.type === "MERCHANT") {
@@ -474,7 +481,10 @@ function spawnEnemyGroup() {
 
     for(let g=0; g<groupCount; g++) {
         let count = 1;
-        if (wave >= 6 && random() < 0.2) { type = "PHALANX_TRIO"; count = 1; }
+        // --- 変更: 新しい敵の出現ロジックを追加 ---
+        if (wave >= 15 && random() < 0.15) { type = "COMMANDER"; count = 1; }
+        else if (wave >= 10 && random() < 0.2) { type = "SNIPER"; count = 1; }
+        else if (wave >= 6 && random() < 0.2) { type = "PHALANX_TRIO"; count = 1; }
         else if (wave >= 10 && r > 0.7) {
             let r3 = random();
             if(r3 < 0.25) type = "PLAGUE"; else if (r3 < 0.5) type = "MEDUSA"; else if (r3 < 0.75) type = "CURSER"; else type = "HOOKER";
@@ -564,6 +574,15 @@ function updateProjectiles(list, targets, isPlayerOwner) {
                     if (isPlayerOwner) {
                          t.takeDamage(p.val, p.card);
                          
+                         // --- 追加: 特性「VOID」による弾の消滅 ---
+                         if (t.eliteTrait === "VOID") {
+                             p.dead = true;
+                             particles.push(new TextParticle(p.pos.x, p.pos.y, "VOID", "#f0f"));
+                             // 貫通属性を持っていても強制的に消滅
+                             break;
+                         }
+                         // ------------------------------------
+
                          if (t.type === "GUARD") {
                              p.dead = true;
                              createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#fff", 5);
@@ -636,8 +655,15 @@ function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
         for(let t of targets) {
             if(dist(x, y, t.pos.x, t.pos.y) < range) {
                 t.takeDamage(dmg, {tag:"EXPLOSION"});
-                let push = p5.Vector.sub(t.pos, createVector(x,y)).setMag(20);
-                t.pos.add(push);
+                
+                // --- 追加: 爆発もノックバックの一種としてIRON特性を考慮 ---
+                if (t instanceof Enemy && t.eliteTrait === "IRON") {
+                    // ノックバックさせない
+                } else {
+                    let push = p5.Vector.sub(t.pos, createVector(x,y)).setMag(20);
+                    t.pos.add(push);
+                }
+                // ----------------------------------------------------
             }
         }
     }
