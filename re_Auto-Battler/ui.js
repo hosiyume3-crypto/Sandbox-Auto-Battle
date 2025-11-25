@@ -168,9 +168,7 @@ function drawLibrary() {
     
     let backW = 120, backH = 50;
     let backX = width - backW - 30;
-    // --- 変更: 位置を30px上に移動 (height - 70 -> height - 100) ---
     let backY = height - 100;
-    // --------------------------------------------------------
     
     let hoverBack = isMouseOver(backX, backY, backW, backH);
     drawButton(backX, backY, backW, backH, "戻る", hoverBack, "#f55");
@@ -232,7 +230,7 @@ function drawClassSelect() {
         fill(150); textSize(10); textAlign(CENTER, TOP);
         let desc = "";
         if(i===0) desc = "近接特化。\n初期: 斬撃, ハンマー, チャージタックル";
-        if(i===1) desc = "遠距離特化。\n初期: 弓矢, ブーメラン, タレット";
+        if(i===1) desc = "遠距離特化。\n初期: 弓矢, ブーメラン, ショットガン";
         if(i===2) desc = "魔法特化。\n初期: ファイア, 衝撃波, ビーム";
         if(i===3) desc = "バランス型。";
         text(desc, x+10, y+60, w-20, 100); textAlign(CENTER);
@@ -273,7 +271,8 @@ function drawUI() {
     else if (player.state === "LOOTING") { fill(255,215,0); text("アイテム収集中", 15, 85); }
     else if (player.state === "CASTING") { fill(255,150,0); text("詠唱中...", 15, 85); }
     
-    drawEquipmentUI(width - 220, 10);
+    // 装備UI (3x2)
+    drawEquipmentUI(width - 200, 10);
     
     fill(200); text("MOVEMENT:", 130, 15);
     stroke(40); noFill(); rect(130, 35, 50, 90, 5);
@@ -304,8 +303,13 @@ function drawUI() {
 function drawEquipmentUI(x, y) {
     fill(200); textSize(12); text("EQUIPMENT:", x, y+5);
     let eqSize = 40; let gap = 10;
+    // 3x2グリッド描画
     for(let i=0; i<MAX_EQUIP_SIZE; i++) { 
-        let ex = x + i*(eqSize+gap); let ey = y + 25; 
+        let col = i % 3;
+        let row = Math.floor(i / 3);
+        let ex = x + col*(eqSize+gap); 
+        let ey = y + 25 + row*(eqSize+gap); 
+        
         stroke(40); fill(15); rect(ex, ey, eqSize, eqSize, 2); 
         if(i < equipment.length) drawCardSimple(ex, ey, eqSize, equipment[i], false, false); 
     }
@@ -329,21 +333,24 @@ function drawCardSimple(x, y, w, c, selected, showStats) {
     if(c.category !== "EQUIP" && c.type !== "MOVE") { noStroke(); let sysColor = SYSTEM_COLORS[c.system] || "#999"; fill(sysColor); rect(x+1, y+1, w-2, 10); } 
     else if (c.category === "EQUIP") { noFill(); stroke(c.color); rect(x+3, y+3, w-6, h-6); }
     
-    if (showStats && c.category === "ACTION" && c.level > 1) {
-         fill(255, 200, 50);
-         textSize(8); textAlign(RIGHT, TOP);
-         text(`Lv.${c.level}`, x+w-2, y+12);
-    }
-
+    // --- 変更: レベル表示位置を右端上から名前の下へ移動 ---
     textAlign(CENTER, CENTER);
-    
     stroke(0); strokeWeight(2); fill(rarityColor); 
-    textSize(9); text(c.name.substring(0,6), x+w/2, y+18);
+    textSize(9); text(c.name.substring(0,6), x+w/2, y+18); // 名前
+    
+    if (showStats && c.category === "ACTION" && c.level > 1) {
+         fill(255, 200, 50); noStroke();
+         textSize(9); 
+         text(`Lv.${c.level}`, x+w/2, y+28); // 名前直下へ
+    }
+    // ---------------------------------------------------
+
     noStroke();
     
     if (showStats && c.category === "ACTION") {
         fill(255,255,0); textSize(8); 
-        text(c.system.toUpperCase(), x+w/2, y+h/2 + 5);
+        // システム表示位置調整 (y+h/2 + 5 -> y+h/2 + 8)
+        text(c.system.toUpperCase(), x+w/2, y+h/2 + 8);
 
         let typeMult = 1.0;
         if(player && c.system === "Melee") typeMult = player.getStat("melee");
@@ -374,20 +381,47 @@ function drawSelectionScreen(title, subtitle) {
         let c = rewardOptions[i]; let x = startX + i*(cardW+gap); let y = 150;
         let isHover = isMouseOver(x, y, cardW, 200);
         
-        stroke((i===rewardIndex || isHover) ? color(255,255,0) : 60); 
-        strokeWeight((i===rewardIndex || isHover) ? 3:1); 
+        // --- 変更: レベルアップ判定と強調 ---
+        let existing = deck.find(d => d.id === c.id);
+        let isLevelUp = (existing && c.category === "ACTION");
+        
+        if (i===rewardIndex || isHover) {
+            stroke(255,255,0); strokeWeight(3);
+        } else if (isLevelUp) {
+            stroke(0, 255, 0); strokeWeight(3); // 緑色で強調
+        } else {
+            stroke(60); strokeWeight(1);
+        }
+        // -----------------------------------
         
         fill(c.category==="EQUIP"? color(30,25,15) : 20); rect(x,y,cardW,200,6); noStroke(); 
+        
+        // --- LEVEL UP 表示 ---
+        if(isLevelUp) {
+            fill(0, 255, 0); textSize(12); textStyle(BOLD);
+            text("LEVEL UP!", x+cardW/2, y - 15);
+        }
+        // --------------------
         
         let rarityCol = RARITY_COLORS[c.rarity] || "#fff";
         if(c.category === "EQUIP") rarityCol = "#fff";
         
         fill(c.color); textSize(16); text(c.name, x+cardW/2, y+25); 
-        fill(rarityCol); textSize(10); text(c.rarity || c.category, x+cardW/2, y+45);
+        
+        // --- レベル表示 (名前の下) ---
+        if (isLevelUp) {
+            fill(255, 200, 50); textSize(12);
+            text(`Lv.${existing.level} -> Lv.${existing.level+1}`, x+cardW/2, y+45);
+        } else {
+            fill(rarityCol); textSize(10); text(c.rarity || c.category, x+cardW/2, y+45);
+        }
+        // ----------------------------
 
         if(c.category === "ACTION") { let sysColor = SYSTEM_COLORS[c.system] || "#999"; fill(sysColor); text(`[${c.system.toUpperCase()}]`, x+cardW/2, y+60); }
         if(c.category === "ACTION") {
-            fill(200,200,255); textSize(11); text(`Range: ${c.id==="assassin"||c.id==="giga_laser"||c.id==="railgun"?"INF":c.range}`, x+cardW/2, y+85); text(`CD: ${(c.cooldownMax/60).toFixed(1)}s`, x+cardW/2, y+100); 
+            fill(200,200,255); textSize(10); 
+            text(`Range: ${c.id==="assassin"||c.id==="giga_laser"||c.id==="railgun"?"INF":c.range}`, x+cardW/2, y+75); 
+            text(`CD: ${(c.cooldownMax/60).toFixed(1)}s`, x+cardW/2, y+90); 
             
             let typeMult = 1.0;
             if(player) {
@@ -396,13 +430,13 @@ function drawSelectionScreen(title, subtitle) {
                 if(c.system === "Magic") typeMult = player.getStat("magic");
             }
             let pwr = Math.floor(c.val * typeMult);
-            text(`Power: ${pwr}`, x+cardW/2, y+115);
+            text(`Power: ${pwr}`, x+cardW/2, y+105);
 
-            fill(255); textAlign(CENTER, TOP); textSize(10); textLeading(14);
-            text(c.desc, x+5, y+135, cardW-10, 80);
+            fill(255); textAlign(CENTER, TOP); textSize(10); textLeading(12);
+            text(c.desc, x+4, y+120, cardW-8, 75);
         } else { 
-            fill(255); textAlign(CENTER, TOP); textSize(10); textLeading(14);
-            text(c.desc, x+5, y+80, cardW-10, 120); 
+            fill(255); textAlign(CENTER, TOP); textSize(10); textLeading(12);
+            text(c.desc, x+4, y+70, cardW-8, 125); 
         } 
         textAlign(CENTER);
     }
@@ -412,6 +446,35 @@ function drawSelectionScreen(title, subtitle) {
     let skipY = 420;
     let hoverSkip = isMouseOver(skipX, skipY, skipW, skipH);
     drawButton(skipX, skipY, skipW, skipH, "選択をスキップ", hoverSkip, "#999");
+
+    // --- 現在の所持カード・装備の確認表示 ---
+    textSize(14); fill(200); textAlign(LEFT, TOP);
+    text("現在の構成:", 50, 480);
+    
+    let miniW = 40; let miniGap = 10;
+    let actionH = miniW * 1.8;
+    
+    // Action Cards
+    let actionCards = deck.filter(c => c.category === "ACTION");
+    for(let i=0; i<actionCards.length; i++) {
+        drawCardSimple(50 + i*(miniW+miniGap), 505, miniW, actionCards[i], false, false);
+    }
+    
+    // Move Card
+    let moveCard = deck.find(c => c.type === "MOVE");
+    if(moveCard) {
+        drawCardSimple(50 + actionCards.length*(miniW+miniGap) + 20, 505, miniW, moveCard, false, false);
+    }
+    
+    // Equipment (Actionの下に配置)
+    let equipY = 505 + actionH + 20;
+    textSize(12); fill(150); textAlign(LEFT, TOP);
+    text("EQUIPMENT:", 50, equipY - 15);
+    
+    for(let i=0; i<equipment.length; i++) {
+        drawCardSimple(50 + i*(miniW+miniGap), equipY, miniW, equipment[i], false, false);
+    }
+    // -------------------------------------------------------------------
 }
 
 function drawSkillTree() {
@@ -420,10 +483,8 @@ function drawSkillTree() {
     textSize(16); fill(255,255,100); text(`SKILL POINTS: ${player.sp}`, width/2, 90);
     
     let skills = [
-        // --- 変更: 説明文を更新 ---
         { name: "VITALITY", val: player.upgrades.hp, desc: "最大HP +20" },
         { name: "STRENGTH", val: player.upgrades.atk, desc: "全ダメージ +12%" },
-        // ----------------------
         { name: "AGILITY", val: player.upgrades.spd, desc: "移動速度 +10%" },
         { name: "RANGE", val: player.upgrades.range, desc: "攻撃範囲 +10%" },
         { name: "LUCK", val: player.upgrades.luck, desc: "ドロップ率 +2.5%" },
