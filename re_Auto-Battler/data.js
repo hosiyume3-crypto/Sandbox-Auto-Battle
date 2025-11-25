@@ -25,30 +25,23 @@ function initLibraries() {
 
     // --- ACTION LIBRARY (日本語) ---
     actionLibrary = [
-        // --- 毒ビルド用カード ---
+        // --- 毒ビルド用カード (調整済み) ---
         A("poison_flask", "毒フラスコ", "Magic", "RANGE", "PROJECTILE", 300, 10, 40, 60, "COMMON", "着弾地点に毒をばら撒く。毒の敵には威力増。"),
         A("bane_bolt", "ベインボルト", "Magic", "MELEE", "ATK", 90, 10, 10, 60, "RARE", "高速の魔法斬撃。毒の敵を切り刻む。"),
         A("toxic_mist", "トキシックミスト", "Magic", "RANGE", "PROJECTILE", 400, 10, 60, 600, "COMMON", "着弾点に毒の霧を発生させる弾を放つ。"),
         A("venom_whip", "ベノムウィップ", "Magic", "AOE", "ATK", 150, 20, 20, 120, "RARE", "前方を一掃。毒の敵に威力3倍。"),
         A("pandemic", "パンデミック", "Magic", "AOE", "ATK", 300, 50, 60, 480, "LEGENDARY", "広範囲攻撃。毒の敵には2倍ダメージ。"),
 
-        // --- 遠距離設置物シナジーカード (6種) - 調整済み ---
-        // スナイパータレット: 攻35, CT14秒(840F)
-        {...A("sniper_turret", "スナイパータレット", "Ranged", "SUMMON", "ALLY", 0, 35, 20, 840, "RARE", "超長射程・高威力の狙撃タレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        // レーザータレット: CT13秒(780F)
-        {...A("laser_turret", "レーザータレット", "Ranged", "SUMMON", "ALLY", 0, 15, 20, 780, "RARE", "貫通するレーザーを放つタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        // ガトリングタレット: CT12秒(720F)
-        {...A("gatling_turret", "ガトリングタレット", "Ranged", "SUMMON", "ALLY", 0, 4, 20, 720, "COMMON", "高速連射を行うタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        // ミサイルタレット: CT16秒(960F)
-        {...A("missile_turret", "ミサイルタレット", "Ranged", "SUMMON", "ALLY", 0, 25, 20, 960, "LEGENDARY", "追尾ミサイルを発射するタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        // アークタレット: CT12秒(720F)
-        {...A("arc_turret", "アークタレット", "Ranged", "SUMMON", "ALLY", 0, 12, 20, 720, "RARE", "範囲内の敵に電撃を放つタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        // フレイムタレット: CT15秒(900F)
-        {...A("flame_turret", "フレイムタレット", "Ranged", "SUMMON", "ALLY", 0, 6, 20, 900, "COMMON", "周囲に炎を撒き散らすタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
-        // ---------------------------------------------
+        // --- 遠距離設置物シナジーカード (6種) ---
+        {...A("sniper_turret", "スナイパータレット", "Ranged", "SUMMON", "ALLY", 0, 40, 20, 720, "RARE", "超長射程・高威力の狙撃タレットを設置。"), color: SYSTEM_COLORS["Turret"]},
+        {...A("laser_turret", "レーザータレット", "Ranged", "SUMMON", "ALLY", 0, 15, 20, 720, "RARE", "貫通するレーザーを放つタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
+        {...A("gatling_turret", "ガトリングタレット", "Ranged", "SUMMON", "ALLY", 0, 4, 20, 600, "COMMON", "高速連射を行うタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
+        {...A("missile_turret", "ミサイルタレット", "Ranged", "SUMMON", "ALLY", 0, 25, 20, 800, "LEGENDARY", "追尾ミサイルを発射するタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
+        {...A("arc_turret", "アークタレット", "Ranged", "SUMMON", "ALLY", 0, 12, 20, 600, "RARE", "範囲内の敵に電撃を放つタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
+        {...A("flame_turret", "フレイムタレット", "Ranged", "SUMMON", "ALLY", 0, 6, 20, 600, "COMMON", "周囲に炎を撒き散らすタレットを設置。"), color: SYSTEM_COLORS["Turret"]},
 
         // --- 既存カード ---
-        A("super_ball", "スーパーボール", "Ranged", "RANGE", "PROJECTILE", 300, 25, 300, 480, "LEGENDARY", "ランダムな方向に発射。壁と敵で跳ね返る。"),
+        A("super_ball", "スーパーボール", "Ranged", "RANGE", "PROJECTILE", 300, 25, 300, 480, "LEGENDARY", "6方向に発射。壁と敵で跳ね返る。"),
         A("gear", "ギア", "Ranged", "RANGE", "PROJECTILE", 999, 25, 120, 240, "RARE", "画面端で5回跳ねる貫通弾。"),
         A("homing_missile", "ミサイル", "Ranged", "RANGE", "PROJECTILE", 600, 18, 60, 300, "RARE", "敵を追尾する弾を複数発射。"),
         A("intercept", "迎撃", "Ranged", "RANGE", "ATK", 50, 80, 10, 480, "COMMON", "至近距離への超高威力射撃。"),
@@ -119,15 +112,25 @@ function initLibraries() {
         E("e_arm", "プレートメイル", {def:0.10}, "#88a", "被ダメージ-10%"),
         E("e_ring", "ルビーの指輪", {melee:0.15, range:0.15, magic:0.15}, "#d44", "全ダメージ+15%"),
         E("e_amul", "時のアミュレット", {cdr:0.05}, "#aa4", "クールダウン短縮-5%"),
+        
         E("e_belt", "ポーションベルト", {potionStockAdd: 2}, "#852", "ポーション所持数+2"),
         E("e_wand", "魔法の杖", {magic: 0.20}, "#c6f", "魔法ダメージ+20%"),
         E("e_scope", "スナイパースコープ", {rangeAdd: 0.20}, "#484", "攻撃射程+20%"),
+        
+        // --- タレット強化装備 (3種) ---
+        E("e_wrench", "整備士のレンチ", {turretDuration: 0.5}, "#fa0", "タレット持続時間+50%"),
+        E("e_lens", "増幅レンズ", {turretRange: 0.3}, "#0ff", "タレット射程+30%"),
+        E("e_overclock", "オーバークロックギア", {turretSpeed: 0.2}, "#f44", "タレット攻撃頻度+20%"),
+        // ---------------------------
+
         E("e_plague", "疫病の仮面", {poisonDuration: 0.5}, "#0a0", "毒の効果時間+50%"),
         E("e_injector", "毒の刃", {poisonChance: 0.2}, "#808", "攻撃時20%で毒を付与"),
         E("e_absorb", "ポイズンイーター", {}, "#80a", "敵が毒ダメージを受ける度HP3回復"),
         E("e_poison_charm", "毒の香炉", {}, "#909", "毒属性カードの出現率が大幅上昇"),
+        
         E("e_vamp", "吸血鬼の牙", {vampire: 10}, "#a00", "撃破時HP10回復"),
         E("e_shield", "タワーシールド", {hpAdd: 25, def:0.05}, "#668", "最大HP+25, 防御+5%"),
+        
         E("e_lucky", "四つ葉のクローバー", {dropRateAdd: 0.10}, "#0f0", "アイテムドロップ率+10%"),
         E("e_barrier", "バリアプリズム", {}, "#0ff", "10秒毎にバリア(30%軽減)"),
         E("e_thorns", "茨の鎧", {def:0.05}, "#582", "被弾時10ダメージ反射"),
@@ -137,11 +140,6 @@ function initLibraries() {
         E("e_battery", "エナジーセル", {cdMult:-0.10}, "#0ff", "クールダウン短縮-10%"),
         E("e_kevlar", "ケブラーベスト", {}, "#444", "射撃ダメージ-30%"),
         E("e_lifering", "再生の指輪", {}, "#f88", "毎秒最大HPの1%回復"),
-        // --- タレット強化装備 ---
-        E("e_wrench", "整備士のレンチ", {turretDuration: 0.5}, "#fa0", "タレット持続時間+50%"),
-        E("e_lens", "増幅レンズ", {turretRange: 0.3}, "#0ff", "タレット射程+30%"),
-        E("e_overclock", "オーバークロックギア", {turretSpeed: 0.2}, "#f44", "タレット攻撃頻度+20%"),
-        // --------------------
         E("e_titan", "タイタングローブ", {}, "#842", "全ダメ+50%, CD+30%")
     ];
 
