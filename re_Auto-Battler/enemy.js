@@ -22,13 +22,17 @@ class Enemy {
         this.orbitState = 0; 
         
         this.noiseOffset = random(1000);
-        
-        this.isAlchemized = false;
         this.eliteTrait = null;
 
         const scaleFactor = Math.floor((wave - 1) / 5);
-        const hpBonus = scaleFactor * 20; 
-        const dmgBonus = scaleFactor * 5; 
+        let hpBonus = scaleFactor * 20; 
+        let dmgBonus = scaleFactor * 5; 
+
+        if (wave >= 15) {
+            let extraScale = wave - 14;
+            hpBonus += extraScale * 25; 
+            dmgBonus += extraScale * 4; 
+        }
 
         let baseHp = 0, baseDmg = 0, speed = 0, size = 0, col = 0;
         
@@ -94,6 +98,13 @@ class Enemy {
             if(frameCount % 60 === 0) { 
                 let poisonDmg = Math.ceil(this.maxHp * 0.03);
                 this.takeDamage(poisonDmg); 
+                
+                // --- 追加: ポイズンイーター (e_absorb) 効果 ---
+                if(player && equipment.some(e => e.id === "e_absorb")) {
+                    player.heal(3);
+                }
+                // -------------------------------------------
+
                 particles.push(new TextParticle(this.pos.x, this.pos.y-5, floor(poisonDmg), "#0f0")); 
             }
             this.poisonTimer--;
@@ -323,7 +334,6 @@ class Enemy {
                 if(cardEffect.id === "stun_gun" || cardEffect.id === "thunder") { this.stunTimer = 60; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "STUN", "#ff0")); }
                 if(cardEffect.id === "icicle") this.slowTimer = 60;
                 if(cardEffect.id === "shadow_bind") { this.stunTimer = 120; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "BIND", "#a0f")); }
-                if(cardEffect.id === "alchemy") this.isAlchemized = true;
             } else if (cardEffect.id === "gravity" || cardEffect.id === "vortex") this.slowTimer = 90;
         }
         if (this.hp <= 0) this.dead = true;
@@ -380,7 +390,6 @@ class Enemy {
         if(this.stunTimer > 0) { mainFill = color(255, 255, 0); outline = color(255,150,0); }
         if(this.poisonTimer > 0) { noStroke(); fill(0,255,0, 100); circle(0,0,this.size+5); }
         if(this.drainTimer > 0) { noFill(); stroke(150,0,255); circle(0,0,this.size+5); noStroke(); }
-        if(this.isAlchemized) { noFill(); stroke(255,215,0); strokeWeight(2); circle(0,0,this.size+8); }
         
         fill(mainFill); stroke(outline); strokeWeight(2); 
 
