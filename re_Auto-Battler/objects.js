@@ -8,10 +8,8 @@ class Deployable {
         // --- 各種タレット・設置物のパラメータ設定 ---
         if (type === "BLACK_HOLE") {
             this.life = 300; this.range = 400;
-        } else if (type === "TOXIC_MIST") {
-            this.life = 300; this.range = 150;
-        } else {
-            // 通常タレット (削除済みだが念のため残す)
+        } 
+        else {
             this.life = 480; this.range = 300; this.maxTimer = 30;
         }
         
@@ -24,10 +22,8 @@ class Deployable {
         if(this.life <= 0) this.dead = true;
         this.timer--;
         
-        // --- 攻撃力にプレイヤーのRangeステータスを反映 ---
         let dmgMult = 1.0;
         if (typeof player !== 'undefined' && player) dmgMult = player.getStat("range");
-        // --------------------------------------------------
 
         if (this.type === "BLACK_HOLE") {
             if(frameCount % 2 === 0) {
@@ -37,19 +33,6 @@ class Deployable {
                 if(dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < this.range) {
                     let pull = p5.Vector.sub(this.pos, e.pos).normalize().mult(1.5);
                     e.pos.add(pull);
-                }
-            }
-        } else if (this.type === "TOXIC_MIST") {
-            if(frameCount % 10 === 0) {
-                particles.push(new Spark(this.pos.x + random(-this.range/2, this.range/2), this.pos.y + random(-this.range/2, this.range/2), "#808", -HALF_PI, random(0.5, 1.5), 20));
-            }
-            if (frameCount % 60 === 0) {
-                let poisonDurMult = 1.0;
-                if(typeof equipment !== 'undefined' && equipment.some(e => e.id === "e_plague")) poisonDurMult = 1.5;
-                for(let e of enemies) {
-                    if(dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < this.range) {
-                        e.applyDebuff("POISON", 5, 300 * poisonDurMult);
-                    }
                 }
             }
         }
@@ -72,16 +55,6 @@ class Deployable {
             drawingContext.shadowBlur = 20; drawingContext.shadowColor = "#a0f";
             noStroke(); fill(0); circle(0,0,60);
             noFill(); stroke(100,0,255); strokeWeight(2); circle(0,0,70 + sin(frameCount*0.2)*10);
-        } else if (this.type === "TOXIC_MIST") {
-            noStroke();
-            fill(128, 0, 128, 50 + sin(frameCount * 0.1) * 20);
-            circle(0, 0, this.range * 2);
-            fill(0, 255, 0, 100);
-            for(let i=0; i<3; i++) {
-                let r = this.range * random(0.2, 0.8);
-                let a = frameCount * 0.05 + i * (TWO_PI/3);
-                circle(cos(a)*r, sin(a)*r, 10 + sin(frameCount*0.2+i)*5);
-            }
         }
         pop();
     }
@@ -131,12 +104,12 @@ class Projectile {
         this.pos = createVector(x, y); this.vel = dirVec.copy().setMag(speed);
         this.card = card; this.val = val; this.color = card.color || "#fff";
         this.dead = false; this.life = (card.id === "flame" || card.id === "flamethrower") ? 20 : 60; 
-        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun" || card.id === "icicle" || card.id === "javelin" || card.id === "gear" || card.id === "super_ball" || card.piercing);
+        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun" || card.id === "icicle" || card.id === "javelin" || card.id === "gear" || card.id === "super_ball" || card.id === "blood_spiller" || card.piercing);
         this.isOrbiter = false; this.orbitAngle = 0; this.orbitRadius = 0;
         
         this.bounceCount = card.bounce || 0;
         if (card.id === "gear") this.bounceCount = 5; 
-        if (card.id === "super_ball") this.bounceCount = 5; // 5回反射
+        if (card.id === "super_ball") this.bounceCount = 5; 
 
         if(card.id === "slow_sphere") this.life = 180; 
         if(card.id === "railgun") this.life = 10; 
@@ -262,18 +235,26 @@ class Projectile {
         else if (this.card.id === "poison_flask") {
             rotate(this.vel.heading());
             fill(0, 255, 0); rect(-6, -4, 12, 8, 2);
-            fill(200); rect(4, -2, 4, 4); // 蓋
+            fill(200); rect(4, -2, 4, 4); 
         }
         else if (this.card.id === "toxic_mist") {
-            fill(150, 0, 150); circle(0,0,12);
-            noFill(); stroke(200, 0, 200); circle(0,0,16);
+            // 乱射される魔法弾
+            fill(150, 0, 200); circle(0,0,12);
+            fill(0, 255, 100, 150); circle(0,0,8);
+        }
+        else if (this.card.id === "blood_spiller") {
+            // 回転する血の刃
+            rotate(frameCount * 0.4);
+            fill(200, 0, 0); noStroke();
+            beginShape();
+            vertex(0, -5); vertex(20, 0); vertex(0, 5); vertex(-5, 0);
+            endShape(CLOSE);
         }
         else if (this.card.id === "throwing_knife") {
-            // --- ナイフの描画 ---
             rotate(frameCount * 0.5);
             fill(200); noStroke();
-            rect(-2, -8, 4, 16); // 刃
-            fill(100, 50, 0); rect(-2, 8, 4, 6); // 柄
+            rect(-2, -8, 4, 16); 
+            fill(100, 50, 0); rect(-2, 8, 4, 6); 
         }
         else if(this.isBoomerang) { 
             rotate(frameCount * 0.5); 
