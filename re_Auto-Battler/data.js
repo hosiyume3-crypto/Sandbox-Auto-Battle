@@ -25,33 +25,38 @@ function initLibraries() {
 
     // --- ACTION LIBRARY (日本語) ---
     actionLibrary = [
+        // --- 出血（BLEED）シナジーカード ---
+        A("serrated_cleaver", "鋸鉈", "Melee", "MELEE", "DEBUFF", 60, 15, 20, 60, "COMMON", "至近距離を斬りつけ、確定で[出血]させる。"),
+        A("heavy_sledge", "ヘビースレッジ", "Melee", "MELEE", "ATK", 70, 25, 50, 240, "RARE", "強烈な一撃。[出血]の敵を大きく吹き飛ばす。"),
+        A("blood_spiller", "ブラッドスピラー", "Melee", "SELF", "BUFF", 150, 8, 0, 360, "RARE", "周囲を回る刃を展開し、接触した敵を[出血]させる。"),
+        A("sanguine_dash", "鮮血の追撃", "Melee", "MELEE", "ATK", 600, 25, 30, 180, "COMMON", "[出血]中の敵へ高速突進し、傷口を抉る。"),
+        A("open_wounds", "開傷", "Melee", "AOE", "ATK", 999, 30, 60, 600, "LEGENDARY", "全画面の[出血]敵の傷を開き、大ダメージ＆スタン。"),
+        A("bloody_storm", "ブラッディストーム", "Melee", "MELEE", "ATK", 150, 12, 60, 300, "RARE", "移動しながら回転斬りを行い、周囲を[出血]させる。"),
+        
+        // --- 追加: 血の渇望 (トゲ鉄球の入れ替え) ---
+        A("blood_thirst", "血の渇望", "Melee", "AOE", "DEBUFF", 250, 10, 30, 300, "RARE", "広範囲の敵を[出血]させ、自分に引き寄せる。"),
+
         // --- 指名手配（WANTED）シナジーカード ---
         A("wanted_poster", "指名手配書", "Ranged", "RANGE", "DEBUFF", 600, 5, 20, 180, "COMMON", "対象を[指名手配]にする。既にある場合は発動しない。"),
         A("lasso", "投げ縄", "Ranged", "RANGE", "DEBUFF", 400, 10, 30, 240, "COMMON", "[指名手配]の敵が居る時のみ発動。引き寄せスタン。"),
-        
         A("revolver", "リボルバー", "Ranged", "RANGE", "ATK", 150, 10, 40, 180, "LEGENDARY", "至近6連射。[指名手配]には威力2倍。"),
-        
         A("deputy_shotgun", "保安官の散弾銃", "Ranged", "RANGE", "ATK", 80, 15, 30, 240, "RARE", "扇状発射。[指名手配]には威力増。"),
-        
         A("desert_eagle", "デザートイーグル", "Ranged", "RANGE", "PROJECTILE", 250, 60, 40, 180, "RARE", "高威力の大型拳銃。"),
-
         A("execution", "処刑執行", "Ranged", "RANGE", "ATK", 200, 80, 20, 600, "LEGENDARY", "至近距離への強力な一撃。"),
 
         // --- 毒ビルド用カード ---
         A("poison_flask", "毒フラスコ", "Magic", "RANGE", "PROJECTILE", 300, 10, 40, 60, "COMMON", "着弾地点に毒をばら撒く。毒の敵には威力増。"),
         A("bane_bolt", "ベインボルト", "Magic", "MELEE", "ATK", 90, 10, 10, 60, "RARE", "高速の魔法斬撃。毒の敵を切り刻む。"),
-        A("toxic_mist", "トキシックミスト", "Magic", "RANGE", "PROJECTILE", 400, 10, 60, 600, "COMMON", "着弾点に毒の霧を発生させる弾を放つ。"),
+        A("toxic_mist", "トキシックミスト", "Magic", "RANGE", "PROJECTILE", 400, 6, 40, 180, "COMMON", "毒を付与する魔法弾を乱れ撃つ。"),
         A("venom_whip", "ベノムウィップ", "Magic", "AOE", "ATK", 150, 20, 20, 120, "RARE", "前方を一掃。毒の敵に威力3倍。"),
         A("pandemic", "パンデミック", "Magic", "AOE", "ATK", 300, 50, 60, 480, "LEGENDARY", "広範囲攻撃。毒の敵には2倍ダメージ。"),
 
         // --- 既存カード ---
-        // 変更: durationを10に短縮 (即座に次の行動へ)
         A("super_ball", "スーパーボール", "Ranged", "RANGE", "PROJECTILE", 300, 25, 10, 480, "LEGENDARY", "ランダムに6発発射。5回反射する。"),
-        
         A("gear", "ギア", "Ranged", "RANGE", "PROJECTILE", 999, 25, 120, 240, "RARE", "画面端で5回跳ねる貫通弾。"),
         A("homing_missile", "ミサイル", "Ranged", "RANGE", "PROJECTILE", 600, 18, 60, 300, "RARE", "敵を追尾する弾を複数発射。"),
         A("intercept", "迎撃", "Ranged", "RANGE", "ATK", 50, 80, 10, 480, "COMMON", "至近距離への超高威力射撃。"),
-        A("spear_flurry", "槍撃乱舞", "Melee", "MELEE", "ATK", 150, 25, 60, 300, "LEGENDARY", "前方を高速の連続突きを繰り出す。"),
+        A("spear_flurry", "槍撃乱舞", "Melee", "MELEE", "ATK", 150, 20, 60, 300, "LEGENDARY", "前方を高速の連続突きを繰り出す。"),
         A("martial_arts", "格闘術", "Melee", "MELEE", "ATK", 60, 15, 10, 30, "COMMON", "隙の少ない超高速連打。"),
         A("roar", "咆哮", "Melee", "AOE", "ATK", 200, 5, 40, 300, "RARE", "周囲の敵を大きく吹き飛ばす。"),
         A("pile_bunker", "パイルバンカー", "Melee", "MELEE", "ATK", 50, 40, 40, 360, "RARE", "至近単体に威力40＆強撃退。"),
@@ -105,7 +110,6 @@ function initLibraries() {
         A("fireball", "ファイアボール", "Magic", "RANGE", "PROJECTILE", 350, 21, 50, 150, "COMMON", "高威力の火球を放つ。"),
         A("thunder", "サンダー", "Magic", "RANGE", "DEBUFF", 400, 28, 20, 420, "RARE", "ランダムな敵に落雷。"),
         {...A("shooting_star", "シューティングスター", "Magic", "RANGE", "PROJECTILE", 500, 45, 60, 240, "LEGENDARY", "敵の間を跳ね回る星。"), bounce: 6},
-        A("icicle", "アイシクル", "Magic", "RANGE", "DEBUFF", 100, 21, 40, 90, "RARE", "氷柱2発。スロウ付与。"),
         A("heal", "ヒール", "Heal", "SELF", "HEAL", 0, 28, 40, 600, "LEGENDARY", "自身のHPを回復する。"),
     ];
 
@@ -118,9 +122,13 @@ function initLibraries() {
         E("e_ring", "ルビーの指輪", {melee:0.15, range:0.15, magic:0.15}, "#d44", "全ダメージ+15%"),
         E("e_amul", "時のアミュレット", {cdr:0.05}, "#aa4", "クールダウン短縮-5%"),
         
-        // --- 追加: 指名手配系装備 ---
         E("iron_ball", "鉄球", {}, "#888", "[指名手配]の敵の移動速度-20%"),
         E("handcuffs", "手錠", {}, "#ccc", "[指名手配]の敵からの被ダメ-30%"),
+        
+        E("spiked_gauntlets", "スパイクガントレット", {bleedChance: 0.30}, "#a22", "近接攻撃時30%で[出血]付与"),
+        
+        // 変更: HP10回復
+        E("blood_pendant", "鮮血のペンダント", {}, "#f00", "出血ダメ発生時、10%でHP10回復"),
         
         E("e_belt", "ポーションベルト", {potionStockAdd: 2}, "#852", "ポーション所持数+2"),
         E("e_wand", "魔法の杖", {magic: 0.20}, "#c6f", "魔法ダメージ+20%"),
