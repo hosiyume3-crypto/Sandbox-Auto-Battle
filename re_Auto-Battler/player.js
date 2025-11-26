@@ -6,7 +6,7 @@ class Player {
         this.size = 24;
         this.level = 1;
         this.sp = 0;
-        this.upgrades = { hp: 0, atk: 0, spd: 0, range: 0, luck: 0, def: 0 }; 
+        this.upgrades = { hp: 0, atk: 0, spd: 0, range: 0, luck: 0, def: 0, potion: 0 }; // 変更: def -> potion
         
         this.hp = 200; this.maxHp = 200;
         this.potionStock = 0;
@@ -52,6 +52,8 @@ class Player {
         
         if(type === "rangeAdd") val += this.upgrades.range * 0.10; 
         if(type === "dropRateAdd") val += this.upgrades.luck * 0.025; 
+        // 変更: ポーション所持数アップのスキル反映
+        if(type === "potionStockAdd") val += this.upgrades.potion;
 
         for(let e of equipment) {
             if(e.id === "e_rage") {
@@ -85,7 +87,7 @@ class Player {
     }
 
     update() {
-        this.maxHp = 200 + this.upgrades.hp * 20 + this.getStat("hpAdd");
+        this.maxHp = 200 + this.upgrades.hp * 25 + this.getStat("hpAdd"); // 変更: HP増加量を25に
         
         let hasBarrier = equipment.some(e => e.id === "e_barrier");
         if(hasBarrier) {
@@ -240,14 +242,24 @@ class Player {
                 if (this.currentCard.id === "barrage" && this.timer % 15 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "flamethrower" && this.timer % 3 === 0 && this.timer > 0) this.performAction(true);
                 if (this.currentCard.id === "fan_laser" && this.timer % 4 === 0 && this.timer > 0) this.performAction(true);
-                // リボルバー連射処理
+                
                 if (this.currentCard.id === "revolver" && this.timer % 6 === 0 && this.timer > 0) this.performAction(true);
                 
+                if (this.currentCard.id === "toxic_mist" && this.timer % 5 === 0 && this.timer > 0) this.performAction(true);
+                if (this.currentCard.id === "bloody_storm" && this.timer % 5 === 0 && this.timer > 0) this.performAction(true);
+
                 if (this.currentCard.id === "gatotsu" && this.target) {
                     let dashDir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                     this.pos.add(dashDir.mult(40)); 
                     this.constrainPosition(); 
                     particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#f00", 5));
+                }
+                
+                if (this.currentCard.id === "sanguine_dash" && this.target) {
+                     let dashDir = p5.Vector.sub(this.target.pos, this.pos).normalize();
+                     this.pos.add(dashDir.mult(25));
+                     this.constrainPosition();
+                     if(frameCount % 3 === 0) particles.push(new AfterImage(this.pos.x, this.pos.y, this.size, "#a00", 5));
                 }
             }
 
@@ -290,27 +302,33 @@ class Player {
 
     processCardLogic(card) {
         if (card.id === "counter") { this.performAction(); return; }
-        if (card.system === "Heal" || card.id === "teleport" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor") { this.performAction(); return; }
+        if (card.system === "Heal" || card.id === "teleport" || card.id === "orbit_fire" || card.id === "air_raid" || card.id === "thunder" || card.id === "black_hole" || card.id === "meteor" || card.id === "open_wounds" || card.id === "blood_spiller") { this.performAction(); return; }
         
         let targetEnemy;
         
-        // --- 指名手配（WANTED）ターゲット優先ロジック ---
         let wanted = enemies.find(e => e.isWanted && !e.dead);
         if (wanted) {
             targetEnemy = wanted;
         }
-        // ----------------------------------------------
         else if (card.id === "assassin" || card.id === "gatotsu") targetEnemy = this.getFarthestEnemy();
         else targetEnemy = this.getClosestEnemy();
 
+        if (card.id === "sanguine_dash") {
+             let bleeding = enemies.find(e => e.bleedTimer > 0 && !e.dead);
+             if (bleeding) targetEnemy = bleeding;
+             else {
+                 this.deckIndex = (this.deckIndex + 1) % deck.length;
+                 this.state = "IDLE";
+                 uiParticles.push(new UIParticle(player.pos.x, player.pos.y - 30, "No Bleed", "#888", 30));
+                 return; 
+             }
+        }
+        
         if (!targetEnemy) { 
             this.state = "IDLE";
             return; 
         }
         
-        // --- 条件による発動スキップ処理 ---
-        
-        // 投げ縄: 指名手配の敵が居ない場合は発動しない
         if (card.id === "lasso" && !targetEnemy.isWanted) {
             this.deckIndex = (this.deckIndex + 1) % deck.length;
             this.state = "IDLE";
@@ -318,14 +336,12 @@ class Player {
             return;
         }
         
-        // 指名手配書: 既に指名手配の敵が居る場合は発動しない
         if (card.id === "wanted_poster" && wanted) {
             this.deckIndex = (this.deckIndex + 1) % deck.length;
             this.state = "IDLE";
             uiParticles.push(new UIParticle(player.pos.x, player.pos.y - 30, "Already Wanted", "#888", 30));
             return;
         }
-        // ----------------------------------------
         
         if (card.id === "intercept") {
             let distToTarget = dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y);
@@ -346,7 +362,7 @@ class Player {
             return;
         }
 
-        let effectiveRange = (card.id === "assassin" || card.id === "gatotsu" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "life_drain" || card.id === "air_raid" || card.id === "gear" || card.id === "super_ball") ? 9999 : card.range;
+        let effectiveRange = (card.id === "assassin" || card.id === "gatotsu" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "life_drain" || card.id === "air_raid" || card.id === "gear" || card.id === "super_ball" || card.id === "sanguine_dash" || card.id === "blood_thirst") ? 9999 : card.range;
         if(card.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
         
         if (dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y) <= effectiveRange) {
@@ -454,6 +470,29 @@ class Player {
             createImpactSparks(this.pos.x, this.pos.y, -HALF_PI, "#ff0", 15);
             return;
         }
+        
+        if (c.id === "blood_spiller") {
+            for(let i=0; i<3; i++) {
+                let p = new Projectile(this.pos.x, this.pos.y, createVector(0,0), c, finalVal, 0);
+                p.isOrbiter = true; p.orbitAngle = i * (TWO_PI/3); p.orbitRadius = 70; p.life = 360;
+                projectiles.push(p);
+            }
+            return;
+        }
+        
+        if (c.id === "open_wounds") {
+            addShake(10);
+            triggerFlash(20);
+            for(let e of enemies) {
+                if (e.bleedTimer > 0) {
+                    e.takeDamage(finalVal, c);
+                    e.applyStatus("STUN", 90);
+                    particles.push(new SlashEffect(e.pos.x, e.pos.y, "#a00", 60));
+                    particles.push(new TextParticle(e.pos.x, e.pos.y, "GOUGE!", "#f00"));
+                }
+            }
+            return;
+        }
 
         if (c.id === "backstep") {
             if (this.target) {
@@ -538,7 +577,7 @@ class Player {
         } 
         else if (c.style === "AOE") {
             particles.push(new Shockwave(this.pos.x, this.pos.y, c.range, c.color));
-            if(c.id === "cleave" || c.id === "vortex" || c.id === "repel" || c.id === "shadow_bind" || c.id === "alchemy" || c.id === "venom_whip") particles.push(new SlashEffect(this.pos.x, this.pos.y, c.color, c.range, true));
+            if(c.id === "cleave" || c.id === "vortex" || c.id === "repel" || c.id === "shadow_bind" || c.id === "alchemy" || c.id === "venom_whip" || c.id === "blood_thirst") particles.push(new SlashEffect(this.pos.x, this.pos.y, c.color, c.range, true));
             
             if (c.id === "roar" || c.id === "pandemic") { 
                 particles.push(new Shockwave(this.pos.x, this.pos.y, c.range * 1.5, "#fff")); 
@@ -548,7 +587,17 @@ class Player {
             
             for(let e of enemies) {
                 if(dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < c.range) {
-                    if(c.id === "poison") {
+                    // --- 追加: 血の渇望の実装 ---
+                    if (c.id === "blood_thirst") {
+                        e.takeDamage(finalVal, c);
+                        e.applyDebuff("BLEED", 0, 300);
+                        let pull = p5.Vector.sub(this.pos, e.pos).setMag(150);
+                        e.pos.add(pull);
+                        particles.push(new TextParticle(e.pos.x, e.pos.y, "PULL!", "#f00"));
+                    }
+                    // ---------------------------
+                    
+                    else if(c.id === "poison") {
                         e.applyDebuff("POISON", finalVal, 240 * poisonDurMult);
                         particles.push(new TextParticle(e.pos.x, e.pos.y, "POISON", c.color));
                     } else if (c.id === "toxic_mist") {
@@ -609,6 +658,7 @@ class Player {
                     addShake(5);
                 }
                 if (c.id === "gatotsu") return; 
+                if (c.id === "sanguine_dash") return; // 追撃はupdateで処理済
 
                 if (c.id === "ragnarok") {
                      createExplosion(this.target.pos.x, this.target.pos.y, finalVal, 250, true, "#ff0");
@@ -625,7 +675,7 @@ class Player {
 
                 let angle = p5.Vector.sub(this.target.pos, this.pos).heading();
                 
-                if (c.id === "hammer") {
+                if (c.id === "hammer" || c.id === "heavy_sledge") {
                     particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 100, c.color));
                 } else if (c.id === "spear" || c.id === "spear_flurry") {
                     particles.push(new StabEffect(this.pos.x, this.pos.y, angle, c.color, 120));
@@ -634,6 +684,9 @@ class Player {
                     particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 60, c.color));
                 } else if (c.id === "martial_arts" || c.id === "bane_bolt") {
                     particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 40, false, angle));
+                } else if (c.id === "bloody_storm") {
+                    // 回転斬りエフェクト
+                    particles.push(new SlashEffect(this.pos.x, this.pos.y, "#a00", 120, true));
                 } else {
                     particles.push(new SlashEffect(this.target.pos.x, this.target.pos.y, c.color, 70, false, angle));
                 }
@@ -642,6 +695,7 @@ class Player {
                 addShake(3);
                 
                 let splashRange = 80; 
+                if (c.id === "bloody_storm") splashRange = 120;
                 
                 for(let e of enemies) {
                     if(dist(this.target.pos.x, this.target.pos.y, e.pos.x, e.pos.y) < splashRange) {
@@ -656,6 +710,15 @@ class Player {
                          if(c.id === "shield_bash" && e === this.target) { this.defBuffTimer = 120; particles.push(new TextParticle(this.pos.x, this.pos.y-10, "DEF UP", "#00f")); }
                          let kb = 30; 
                          if (c.id === "hammer") { kb = 150; triggerFlash(10); }
+                         
+                         // --- ヘビースレッジのノックバック強化 ---
+                         if (c.id === "heavy_sledge") { 
+                             kb = 150; 
+                             if (e.bleedTimer > 0) { kb = 300; particles.push(new TextParticle(e.pos.x, e.pos.y, "SMASH!", "#f00")); }
+                             triggerFlash(10); 
+                         }
+                         // -------------------------------------------
+
                          if (c.id === "shield_bash") kb = 60;
                          if (c.id === "dagger") kb = 15; 
                          if (c.id === "charge") kb = 80;
@@ -695,6 +758,12 @@ class Player {
                 
                 if (c.id === "m_gun") dir.rotate(random(-0.1, 0.1));
                 if (c.id === "flamethrower") dir.rotate(random(-0.2, 0.2));
+                
+                if (c.id === "toxic_mist") {
+                    let spread = dir.copy().rotate(random(-0.4, 0.4));
+                    projectiles.push(new Projectile(this.pos.x, this.pos.y, spread, c, finalVal, 12));
+                    return;
+                }
 
                 if (c.id === "fan_laser") {
                      let angleOffset = map(this.timer, c.duration, 0, -0.5, 0.5);
@@ -744,15 +813,12 @@ class Player {
                         projectiles.push(p);
                     }
                 }
-                // --- 指名手配系カードのプロジェクタイル生成 (変更) ---
                 else if (c.id === "revolver") {
-                    // 変更: 単発発射 (updateで連射)
                     let spreadDir = dir.copy().rotate(random(-0.05, 0.05));
                     projectiles.push(new Projectile(this.pos.x, this.pos.y, spreadDir, c, finalVal, 25));
                     addShake(1);
                 }
                 else if (c.id === "deputy_shotgun") {
-                    // 扇状に5発
                     for(let i=0; i<5; i++) {
                         let spreadDir = dir.copy().rotate(map(i, 0, 4, -0.3, 0.3));
                         projectiles.push(new Projectile(this.pos.x, this.pos.y, spreadDir, c, finalVal, 18));
@@ -760,7 +826,6 @@ class Player {
                     addShake(4);
                 }
                 else if (c.id === "desert_eagle") {
-                    // 高速単発
                     projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 35));
                     addShake(5);
                 }
@@ -774,7 +839,6 @@ class Player {
                     projectiles.push(new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 25));
                     addShake(6);
                 }
-                // ------------------------------------------
 
                 else if (c.id === "homing_missile") {
                     for(let i=0; i<4; i++) {
@@ -792,10 +856,6 @@ class Player {
                 }
                 else if (c.id === "poison_flask") {
                     let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 18);
-                    projectiles.push(p);
-                }
-                else if (c.id === "toxic_mist") {
-                    let p = new Projectile(this.pos.x, this.pos.y, dir, c, finalVal, 20);
                     projectiles.push(p);
                 }
                 else {
@@ -881,12 +941,10 @@ class Player {
         
         reduction += this.upgrades.def * 0.05; 
         
-        // --- 手錠効果 ---
         if (attacker && attacker.isWanted && equipment.some(e => e.id === "handcuffs")) {
-            reduction += 0.3; // 30%軽減
+            reduction += 0.3; 
             if (frameCount % 30 === 0) particles.push(new TextParticle(this.pos.x, this.pos.y - 15, "GUARD", "#ccc"));
         }
-        // ----------------
 
         let finalDmg = Math.max(1, Math.floor(amt * (1.0 - Math.min(0.9, reduction))));
         this.hp -= finalDmg;
