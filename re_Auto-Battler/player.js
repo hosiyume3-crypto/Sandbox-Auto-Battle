@@ -362,7 +362,8 @@ class Player {
             return;
         }
 
-        let effectiveRange = (card.id === "assassin" || card.id === "gatotsu" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "life_drain" || card.id === "air_raid" || card.id === "gear" || card.id === "super_ball" || card.id === "sanguine_dash" || card.id === "blood_thirst") ? 9999 : card.range;
+        // 変更: life_drain 削除
+        let effectiveRange = (card.id === "assassin" || card.id === "gatotsu" || card.id === "giga_laser" || card.id === "slow_sphere" || card.id === "air_raid" || card.id === "gear" || card.id === "super_ball" || card.id === "sanguine_dash" || card.id === "blood_thirst") ? 9999 : card.range;
         if(card.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
         
         if (dist(this.pos.x, this.pos.y, targetEnemy.pos.x, targetEnemy.pos.y) <= effectiveRange) {
@@ -422,7 +423,8 @@ class Player {
         }
         
         if (this.state !== "LOOTING" && this.currentCard) {
-             let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "gatotsu" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere" || this.currentCard.id === "life_drain") ? 9999 : this.currentCard.range;
+             // 変更: life_drain 削除
+             let effectiveRange = (this.currentCard.id === "assassin" || this.currentCard.id === "gatotsu" || this.currentCard.id === "giga_laser" || this.currentCard.id === "slow_sphere") ? 9999 : this.currentCard.range;
              if(this.currentCard.system === "Ranged") effectiveRange *= (1 + this.getStat("rangeAdd"));
              
              if (dist(this.pos.x, this.pos.y, this.target.pos.x, this.target.pos.y) <= effectiveRange) {
@@ -641,6 +643,9 @@ class Player {
                         if(c.id === "hammer") pushForce = 120; 
                         if(c.id === "roar") pushForce = 180;
                         
+                        // 変更: ノックバック倍率の適用
+                        if(e.kbMult) pushForce *= e.kbMult;
+
                         let push = p5.Vector.sub(e.pos, this.pos).setMag(pushForce);
                         if(c.id === "gravity" || c.id === "vortex") push = p5.Vector.sub(this.pos, e.pos).setMag(pushForce * -1);
                         e.pos.add(push);
@@ -729,6 +734,9 @@ class Player {
                          if (c.id === "martial_arts") kb = 5;
                          if (c.id === "spear_flurry") kb = 60;
                          
+                         // 変更: ノックバック倍率の適用
+                         if(e.kbMult) kb *= e.kbMult;
+
                          let push = p5.Vector.sub(e.pos, this.pos).setMag(kb);
                          e.pos.add(push);
                     }
@@ -741,20 +749,12 @@ class Player {
             } else if (c.system === "Ranged" || (c.system === "Magic" && c.tag === "PROJECTILE")) {
                 let dir = p5.Vector.sub(this.target.pos, this.pos).normalize();
                 
+                // 変更: life_drain 削除
+                /*
                 if (c.id === "life_drain") {
-                    let drainAmt = Math.floor(this.target.maxHp * 0.25);
-                    this.target.takeDamage(drainAmt, c);
-                    this.heal(drainAmt);
-                    particles.push(new TextParticle(this.target.pos.x, this.target.pos.y, "DRAIN", "#a0f"));
-                    particles.push(new Shockwave(this.target.pos.x, this.target.pos.y, 40, "#a0f"));
-                    for(let i=0; i<5; i++) {
-                        let p = new Spark(this.target.pos.x, this.target.pos.y, "#f0a", 0, 0, 30);
-                        p.vel = p5.Vector.sub(this.pos, this.target.pos).normalize().mult(random(5,8));
-                        p.drag = 1.0;
-                        particles.push(p);
-                    }
-                    return; 
+                    ...
                 }
+                */
                 
                 if (c.id === "m_gun") dir.rotate(random(-0.1, 0.1));
                 if (c.id === "flamethrower") dir.rotate(random(-0.2, 0.2));
