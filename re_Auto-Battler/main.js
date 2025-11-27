@@ -1,899 +1,284 @@
-/* Sandbox Auto-Battler V35 - Main Loop & Game Logic */
+/* Sandbox Auto-Battler V35 - Game Objects (Projectiles, Drops, Deployables) */
 
-// --- ASSETS & DATA ---
-function setup() {
-    createCanvas(VIEW_W, VIEW_H + UI_HEIGHT);
-    frameRate(60);
-    textFont("Noto Sans JP");
-    initLibraries();
-    camX = WORLD_W / 2 - width / 2;
-    camY = WORLD_H / 2 - height / 2;
-}
-
-let totalKills = 0;
-let spProgress = 0;
-let killsForNextSp = 10;
-
-// --- グローバルステート管理 ---
-let libraryTab = "ACTION";
-let libraryActionFilter = "ALL";
-let isPaused = false;
-let uiParticles = [];
-
-// --- MAIN LOOP ---
-function draw() {
-    background(10);
-    updateMouseHover();
-
-    if (player && gameState === "PLAY" && !isPaused) {
-        let targetX = player.pos.x - width / 2;
-        let targetY = player.pos.y - (height - UI_HEIGHT) / 2;
-
-        if (!isNaN(targetX) && !isNaN(targetY) && isFinite(targetX) && isFinite(targetY)) {
-            camX = lerp(camX, targetX, 0.08);
-            camY = lerp(camY, targetY, 0.08);
+class Deployable {
+    constructor(x, y, type) {
+        this.pos = createVector(x, y);
+        this.type = type;
+        
+        // --- 各種タレット・設置物のパラメータ設定 ---
+        if (type === "BLACK_HOLE") {
+            this.life = 300; this.range = 400;
+        } 
+        else {
+            this.life = 480; this.range = 300; this.maxTimer = 30;
         }
+        
+        this.timer = 0;
+        this.dead = false;
+    }
 
-        if (isNaN(camX) || isNaN(camY) || !isFinite(camX) || !isFinite(camY)) {
-            camX = WORLD_W / 2 - width / 2;
-            camY = WORLD_H / 2 - height / 2;
-        }
+    update() {
+        this.life--;
+        if(this.life <= 0) this.dead = true;
+        this.timer--;
+        
+        let dmgMult = 1.0;
+        if (typeof player !== 'undefined' && player) dmgMult = player.getStat("range");
 
-        if (shakePower > 0) {
-            camX += random(-shakePower, shakePower);
-            camY += random(-shakePower, shakePower);
-            shakePower *= 0.9;
-            if (shakePower < 0.5) shakePower = 0;
+        if (this.type === "BLACK_HOLE") {
+            if(frameCount % 2 === 0) {
+                particles.push(new Spark(this.pos.x + random(-20,20), this.pos.y + random(-20,20), "#a0f", 0, 0, 10));
+            }
+            for(let e of enemies) {
+                if(dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < this.range) {
+                    let pull = p5.Vector.sub(this.pos, e.pos).normalize().mult(1.5);
+                    e.pos.add(pull);
+                }
+            }
         }
     }
 
-    if (gameState === "LIBRARY" || gameState === "TITLE") {
-    } else {
-        push();
-        translate(-camX, -camY);
-        drawGrid();
-        if (gameState === "PLAY" || gameState === "PAUSE" || gameState.includes("SELECT") || gameState === "GAME_OVER" || gameState === "SKILL_TREE" || gameState.includes("DISCARD")) {
-            if (gameState === "PLAY" && !isPaused) updateGame();
-            drawGame();
+    getClosestEnemy() {
+        let closest = null; let minDist = 9999;
+        for (let e of enemies) {
+            let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
+            if (d < minDist && d < this.range) { minDist = d; closest = e; }
+        }
+        return closest;
+    }
+
+    draw() {
+        push(); translate(this.pos.x, this.pos.y);
+        drawingContext.shadowBlur = 10;
+        
+        if (this.type === "BLACK_HOLE") {
+            drawingContext.shadowBlur = 20; drawingContext.shadowColor = "#a0f";
+            noStroke(); fill(0); circle(0,0,60);
+            noFill(); stroke(100,0,255); strokeWeight(2); circle(0,0,70 + sin(frameCount*0.2)*10);
         }
         pop();
     }
+}
 
-    if (screenFlash > 0) {
-        noStroke(); fill(255, screenFlash); rect(0, 0, width, height - UI_HEIGHT);
-        screenFlash *= 0.8; if (screenFlash < 5) screenFlash = 0;
+class Drop {
+    constructor(x, y, type) { 
+        this.pos = createVector(x, y); 
+        this.type = type; 
+        this.size = 15; 
+        this.floatOffset = random(TWO_PI); 
+        this.age = 0; 
     }
-
-    // UI描画
-    if (gameState === "TITLE") {
-        drawTitle();
-    } else if (gameState === "LIBRARY") {
-        drawLibrary();
-    } else if (gameState === "SELECT_CLASS") {
-        drawClassSelect();
-    } else {
-        fill(20); noStroke(); rect(0, height - UI_HEIGHT, width, UI_HEIGHT);
-        stroke(50); line(0, height - UI_HEIGHT, width, height - UI_HEIGHT); noStroke();
-        drawUI();
-
-        for (let i = uiParticles.length - 1; i >= 0; i--) {
-            uiParticles[i].update();
-            uiParticles[i].draw();
-            if (uiParticles[i].dead) uiParticles.splice(i, 1);
+    update() { 
+        this.floatOffset += 0.1; 
+        this.age++;
+    }
+    draw() {
+        let yOff = sin(this.floatOffset)*3;
+        push(); translate(this.pos.x, this.pos.y + yOff);
+        drawingContext.shadowBlur = 15;
+        if (this.type === "POTION") { 
+            drawingContext.shadowColor = "#f88"; 
+            fill(255,100,100); noStroke(); 
+            beginShape(); vertex(-5,5); vertex(5,5); vertex(5,-5); vertex(3,-8); vertex(-3,-8); vertex(-5,-5); endShape(CLOSE); 
+            fill(255); circle(2,-2,3); 
+        } else if (this.type === "HEART") {
+            drawingContext.shadowColor = "#f00"; 
+            fill(255, 0, 0); noStroke();
+            beginShape();
+            vertex(0, 5);
+            bezierVertex(-5, 0, -10, -5, 0, -10);
+            bezierVertex(10, -5, 5, 0, 0, 5);
+            endShape(CLOSE);
         }
-
-        if (gameState === "PLAY" && isPaused) {
-            drawPauseMenu();
+        else { 
+            drawingContext.shadowColor = "#fb0"; 
+            fill(200, 150, 0); stroke(255,200,50); strokeWeight(2); 
+            rect(-8, -6, 16, 12); line(-8, -2, 8, -2); 
         }
-        else if (gameState === "LEVEL_UP") drawSelectionScreen("LEVEL UP!", "報酬を選択してください");
-        else if (gameState === "SKILL_TREE") drawSkillTree();
-        else if (gameState === "EQUIP_SELECT") drawSelectionScreen("RARE DROP!", "装備を選択してください");
-        else if (gameState === "DISCARD_ACTION") drawDiscardScreen("デッキが一杯です", deck, "ACTION");
-        else if (gameState === "DISCARD_EQUIP") drawDiscardScreen("装備が一杯です", equipment, "EQUIP");
-        else if (gameState === "GAME_OVER") drawGameOver();
+        pop();
     }
 }
 
-function addShake(amount) { shakePower = min(shakePower + amount, 25); }
-function triggerFlash(amount) { screenFlash = min(screenFlash + amount, 150); }
+class Projectile {
+    constructor(x, y, dirVec, card, val, speed) {
+        this.pos = createVector(x, y); this.vel = dirVec.copy().setMag(speed);
+        this.card = card; this.val = val; this.color = card.color || "#fff";
+        this.dead = false; this.life = (card.id === "flame" || card.id === "flamethrower") ? 20 : 60; 
+        this.piercing = (card.style === "AOE" || card.id === "flame" || card.id === "flamethrower" || card.id === "beam" || card.id === "sniper" || card.id === "giga_laser" || card.id === "boomerang" || card.id === "fan_laser" || card.id === "slow_sphere" || card.id === "railgun" || card.id === "icicle" || card.id === "javelin" || card.id === "gear" || card.id === "super_ball" || card.id === "blood_spiller" || card.piercing);
+        this.isOrbiter = false; this.orbitAngle = 0; this.orbitRadius = 0;
+        
+        this.bounceCount = card.bounce || 0;
+        if (card.id === "gear") this.bounceCount = 5; 
+        if (card.id === "super_ball") this.bounceCount = 5; 
 
-function updateMouseHover() {
-    if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
-        let cardW = 120; let gap = 40;
-        let totalW = CARD_CHOICES * cardW + (CARD_CHOICES - 1) * gap;
-        let startX = (width - totalW) / 2;
+        if(card.id === "slow_sphere") this.life = 180; 
+        if(card.id === "railgun") this.life = 10; 
+        if(card.id === "gear") this.life = 180;
+        if(card.id === "super_ball") this.life = 300; 
+        if(card.id === "homing_missile" || card.id === "tracking_rounds") { this.life = 120; this.homing = true; this.target = null; }
 
-        for (let i = 0; i < CARD_CHOICES; i++) {
-            let x = startX + i * (cardW + gap); let y = 150;
-            if (isMouseOver(x, y, cardW, 200)) {
-                rewardIndex = i;
-            }
-        }
-    } else if (gameState === "SKILL_TREE") {
-        let startX = 150; let gapX = 250;
-        let startY = 180; let gapY = 150;
-        for (let i = 0; i < 6; i++) {
-            let r = floor(i / 3); let c = i % 3;
-            let x = startX + c * gapX; let y = startY + r * gapY;
-            if (isMouseOver(x - 80, y - 50, 160, 100)) {
-                skillIndex = i;
-            }
-        }
-    } else if (gameState.includes("DISCARD")) {
-        let list = (gameState === "DISCARD_ACTION") ? deck : equipment;
-        let w = 50; let gap = 10; let totalW = list.length * (w + gap); let sx = (width - totalW) / 2;
-        for (let i = 0; i < list.length; i++) {
-            let x = sx + i * (w + gap); let y = 200;
-            if (isMouseOver(x, y, w, w * 1.8)) {
-                discardIndex = i;
-            }
-        }
+        this.isBoomerang = (card.id === "boomerang");
+        this.returnTimer = 0; 
+        if(this.isBoomerang) this.life = 180; 
+        
+        this.drag = 1.0; 
     }
-}
-
-function mousePressed() {
-    if (gameState === "TITLE") {
-        let btnW = 240, btnH = 50;
-        let startX = width / 2 - btnW / 2;
-        let startY = height / 2 + 20;
-        let libY = height / 2 + 90;
-
-        if (isMouseOver(startX, startY, btnW, btnH)) {
-            gameState = "SELECT_CLASS";
-        }
-        else if (isMouseOver(startX, libY, btnW, btnH)) {
-            gameState = "LIBRARY";
-        }
-    }
-    else if (gameState === "LIBRARY") {
-        let panelY = height - 240;
-        let tabW = 120, tabH = 35;
-        let tabs = ["ACTION", "MOVE", "EQUIP"];
-        let tabSX = 30;
-        let tabSY = panelY + 15;
-        for (let i = 0; i < tabs.length; i++) {
-            let x = tabSX + i * (tabW + 10);
-            if (isMouseOver(x, tabSY, tabW, tabH)) {
-                libraryTab = tabs[i];
-                return;
-            }
-        }
-
-        if (libraryTab === "ACTION") {
-            let filters = ["ALL", "MELEE", "RANGED", "MAGIC"];
-            let filterW = 80, filterH = 25;
-            let filterSX = width - (filters.length * (filterW + 10)) - 30;
-            let filterSY = panelY + 20;
-            for (let i = 0; i < filters.length; i++) {
-                let x = filterSX + i * (filterW + 10);
-                if (isMouseOver(x, filterSY, filterW, filterH)) {
-                    libraryActionFilter = filters[i];
-                    return;
+    update() { 
+        if(this.isOrbiter) {
+            this.orbitAngle += 0.1;
+            this.pos.x = player.pos.x + cos(this.orbitAngle) * this.orbitRadius;
+            this.pos.y = player.pos.y + sin(this.orbitAngle) * this.orbitRadius;
+            this.life--; if(this.life<=0) this.dead=true;
+        } else if(this.isBoomerang) {
+            this.pos.add(this.vel);
+            this.returnTimer++;
+            if(this.returnTimer > 30) { 
+                let toPlayer = p5.Vector.sub(player.pos, this.pos);
+                toPlayer.setMag(1.5); 
+                this.vel.add(toPlayer);
+                this.vel.limit(25); 
+                if(dist(this.pos.x, this.pos.y, player.pos.x, player.pos.y) < 30 && this.returnTimer > 45) {
+                    this.dead = true; 
                 }
             }
-        }
-
-        let backW = 120, backH = 50;
-        let backX = width - backW - 30;
-        let backY = height - 100;
-        if (isMouseOver(backX, backY, backW, backH)) {
-            gameState = "TITLE";
-        }
-    }
-    else if (gameState === "SELECT_CLASS") {
-        let w = 140; let gap = 20; let sx = (width - (4 * w + 3 * gap)) / 2;
-        for (let i = 0; i < 4; i++) {
-            let x = sx + i * (w + gap); let y = 150;
-            if (isMouseOver(x, y, w, 200)) {
-                classIndex = i;
-                playerClass = CLASSES[classIndex];
-                startGame();
-                return;
-            }
-        }
-        let backW = 120, backH = 40;
-        let backX = width / 2 - backW / 2;
-        let backY = 450;
-        if (isMouseOver(backX, backY, backW, backH)) {
-            gameState = "TITLE";
-        }
-    }
-    else if (gameState === "PLAY") {
-        let menuBtnSize = 40;
-        let menuBtnX = width - 50;
-        let menuBtnY = 70;
-        if (isMouseOver(menuBtnX, menuBtnY, menuBtnSize, menuBtnSize)) {
-            isPaused = !isPaused;
-        }
-
-        if (isPaused) {
-            let menuH = 250;
-            let menuY = height / 2 - menuH / 2;
-            let btnW = 200, btnH = 50;
-            let btnX = width / 2 - btnW / 2;
-
-            if (isMouseOver(btnX, menuY + 90, btnW, btnH)) {
-                isPaused = false;
-            }
-            else if (isMouseOver(btnX, menuY + 160, btnW, btnH)) {
-                isPaused = false;
-                gameState = "TITLE";
-            }
-        }
-    }
-    else if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
-        let cardW = 120; let gap = 40;
-        let totalW = CARD_CHOICES * cardW + (CARD_CHOICES - 1) * gap;
-        let startX = (width - totalW) / 2;
-
-        for (let i = 0; i < CARD_CHOICES; i++) {
-            let x = startX + i * (cardW + gap); let y = 150;
-            if (isMouseOver(x, y, cardW, 200)) {
-                rewardIndex = i;
-                confirmSelection();
-                return;
-            }
-        }
-
-        let skipW = 160, skipH = 40;
-        let skipX = width / 2 - skipW / 2;
-        let skipY = 420;
-        if (isMouseOver(skipX, skipY, skipW, skipH)) {
-            gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
-            particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKIPPED", "#999"));
-        }
-    }
-    else if (gameState === "SKILL_TREE") {
-        let startX = 150; let gapX = 250;
-        let startY = 180; let gapY = 150;
-        let r = floor(skillIndex / 3); let c = skillIndex % 3;
-        let x = startX + c * gapX; let y = startY + r * gapY;
-
-        if (isMouseOver(x - 80, y - 50, 160, 100)) {
-            if (player.sp > 0) {
-                player.sp--;
-                if (skillIndex === 0) player.upgrades.hp++;
-                if (skillIndex === 1) player.upgrades.atk++;
-                if (skillIndex === 2) player.upgrades.spd++;
-                if (skillIndex === 3) player.upgrades.range++;
-                if (skillIndex === 4) player.upgrades.luck++;
-                if (skillIndex === 5) player.upgrades.potion++;
-
-                player.maxHp = 200 + player.upgrades.hp * 25 + player.getStat("hpAdd");
-                player.hp = min(player.hp + 50, player.maxHp);
-                particles.push(new TextParticle(width / 2, height / 2, "UPGRADE!", "#ff0"));
-                createImpactSparks(width / 2, height / 2, -HALF_PI, "#ff0", 20);
-            }
-            gameState = "PLAY";
-        }
-    }
-    else if (gameState.includes("DISCARD")) {
-        let list = (gameState === "DISCARD_ACTION") ? deck : equipment;
-        let w = 50; let gap = 10; let totalW = list.length * (w + gap); let sx = (width - totalW) / 2;
-        for (let i = 0; i < list.length; i++) {
-            let x = sx + i * (w + gap); let y = 200;
-            if (isMouseOver(x, y, w, w * 1.8)) {
-                discardIndex = i;
-                confirmDiscard();
-                return;
-            }
-        }
-    }
-    else if (gameState === "GAME_OVER") {
-        let btnW = 240, btnH = 50;
-        let btnX = width / 2 - btnW / 2;
-        let btnY = height / 2 + 80;
-        if (isMouseOver(btnX, btnY, btnW, btnH)) {
-            gameState = "TITLE";
-        }
-    }
-}
-
-// --- LOGIC ---
-function updateGame() {
-    const scaleFactor = Math.floor((wave - 1) / 5);
-    let baseSpawnRate = 360;
-    let reduction = wave * 10 + scaleFactor * 30;
-
-    let maxReduction = (wave >= 15) ? 240 : 180;
-    if (reduction > maxReduction) reduction = maxReduction;
-
-    let spawnRate = baseSpawnRate - reduction;
-
-    if (frameCount % spawnRate === 0) spawnEnemyGroup();
-
-    player.update();
-    updateEnemies();
-    updateDeployables();
-    updateProjectiles(projectiles, enemies, true);
-    updateProjectiles(enemyProjectiles, [player], false);
-    updateDrops();
-    updatePuddles();
-
-    for (let i = particles.length - 1; i >= 0; i--) {
-        particles[i].update();
-        if (particles[i].dead) particles.splice(i, 1);
-    }
-}
-
-function updateDeployables() {
-    for (let i = deployables.length - 1; i >= 0; i--) {
-        deployables[i].update();
-        if (deployables[i].dead) {
-            deployables.splice(i, 1);
-        }
-    }
-}
-
-function updatePuddles() {
-    for (let i = puddles.length - 1; i >= 0; i--) {
-        puddles[i].life--;
-        if (dist(player.pos.x, player.pos.y, puddles[i].x, puddles[i].y) < puddles[i].size / 2) {
-            if (frameCount % 30 === 0) player.takeDamage(5);
-        }
-        if (puddles[i].life <= 0) puddles.splice(i, 1);
-    }
-}
-
-function updateEnemies() {
-    for (let i = enemies.length - 1; i >= 0; i--) {
-        let e = enemies[i];
-        e.update();
-        if (e.dead) {
-            totalKills++;
-            spProgress++;
-            if (spProgress >= killsForNextSp) {
-                player.sp++;
-                gameState = "SKILL_TREE";
-                spProgress = 0;
-                killsForNextSp = min(20, killsForNextSp + 1);
-            }
-
-            // --- 指名手配の継承（最も近い敵へ） ---
-            if (e.isWanted) {
-                let candidates = enemies.filter(en => !en.dead && en !== e);
-                if (candidates.length > 0) {
-                    let nearest = null;
-                    let minDist = 99999;
-                    for (let cand of candidates) {
-                        let d = dist(player.pos.x, player.pos.y, cand.pos.x, cand.pos.y);
-                        if (d < minDist) {
-                            minDist = d;
-                            nearest = cand;
-                        }
-                    }
-                    if (nearest) {
-                        nearest.isWanted = true;
-                        particles.push(new TextParticle(nearest.pos.x, nearest.pos.y - 60, "WANTED!", "#f00", 60));
-                    }
-                }
-            }
-            // -----------------------------------
-
-            if (e.type === "MERCHANT") {
-                particles.push(new TextParticle(e.pos.x, e.pos.y, "JACKPOT!", "#fb0", 80));
-                createExplosion(e.pos.x, e.pos.y, 0, 50, false, "#a0a");
-                spawnDrop(e.pos.x, e.pos.y, "CHEST");
-                spawnDrop(e.pos.x + 20, e.pos.y, "POTION");
-                spawnDrop(e.pos.x - 20, e.pos.y, "POTION");
-                score += 500;
-            } else {
-                let baseDropRate = 0.25;
-                baseDropRate += player.getStat("dropRateAdd");
-
-                if (random() < baseDropRate) {
-                    let r = random();
-                    if (r < 0.10) spawnDrop(e.pos.x, e.pos.y, "CHEST");
-                    else if (r < 0.60) spawnDrop(e.pos.x, e.pos.y, "POTION");
-                    else spawnDrop(e.pos.x, e.pos.y, "HEART");
-                }
-
-                let vamp = player.getStat("vampire");
-                if (vamp > 0) {
-                    player.heal(Math.ceil(vamp));
-                    particles.push(new TextParticle(player.pos.x, player.pos.y - 20, "HP DRAIN", "#f00"));
-                }
-
-                createExplosion(e.pos.x, e.pos.y, 0, 30, false, e.col);
-                score += 100;
-            }
-
-            enemies.splice(i, 1);
-            checkLevelUp();
-        }
-    }
-}
-
-function spawnDrop(x, y, type) { drops.push(new Drop(x, y, type)); }
-
-function updateDrops() {
-    let pickupRangeMult = 1.0;
-
-    let infiniteRange = false;
-    for (let e of equipment) {
-        if (e.id === "e_magnet") {
-            infiniteRange = true;
-            break;
-        }
-    }
-
-    for (let i = drops.length - 1; i >= 0; i--) {
-        let d = drops[i];
-        d.update();
-
-        if ((d.type === "POTION" || d.type === "HEART") && d.age > 600) {
-            drops.splice(i, 1);
-            continue;
-        }
-
-        if (d.type === "HEART" && player.hp >= player.maxHp) continue;
-
-        let distToP = dist(player.pos.x, player.pos.y, d.pos.x, d.pos.y);
-
-        let canPickup = infiniteRange || (distToP < (player.size + d.size) * pickupRangeMult);
-
-        if (canPickup) {
-            if (distToP > player.size + d.size) {
-                let speed = infiniteRange ? 12 : 6;
-                d.pos.add(p5.Vector.sub(player.pos, d.pos).setMag(speed));
-            } else {
-                if (d.type === "POTION") {
-                    let maxPots = 3 + player.getStat("potionStockAdd");
-                    if (player.potionStock < maxPots) {
-                        player.potionStock++;
-                        particles.push(new TextParticle(player.pos.x, player.pos.y, "POTION", "#0f0"));
-                        drops.splice(i, 1);
-                    } else {
-                        if (player.hp < player.maxHp) {
-                            player.heal(Math.ceil(player.maxHp * 0.03));
-                            drops.splice(i, 1);
-                        }
-                    }
-                } else if (d.type === "CHEST") {
-                    generateRewards("EQUIP");
-                    gameState = "EQUIP_SELECT";
-                    rewardIndex = 0;
-                    triggerFlash(30);
-                    addShake(5);
-                    drops.splice(i, 1);
-                } else if (d.type === "HEART") {
-                    player.heal(Math.ceil(player.maxHp * 0.10));
-                    particles.push(new TextParticle(player.pos.x, player.pos.y, "?", "#f00"));
-                    drops.splice(i, 1);
-                }
-            }
-        }
-    }
-}
-
-function checkLevelUp() {
-    enemiesToNextLevel--;
-    if (enemiesToNextLevel <= 0) {
-        player.level++;
-        generateRewards("ACTION");
-        gameState = "LEVEL_UP";
-        rewardIndex = 0;
-        enemiesToNextLevel = 5 + Math.floor(wave * 2.5);
-        wave++;
-        triggerFlash(50);
-        addShake(10);
-    }
-}
-
-function spawnEnemyGroup() {
-    if (random() < 0.02) {
-        let angle = random(TWO_PI);
-        let spawnRadius = width / 2 + 200;
-        let mx = player.pos.x + cos(angle) * spawnRadius;
-        let my = player.pos.y + sin(angle) * spawnRadius;
-        enemies.push(new Enemy(mx, my, "MERCHANT"));
-        particles.push(new TextParticle(mx, my, "Merchant!", "#a0a", 120));
-    }
-
-    let r = random();
-    let type = "BASIC";
-    let groupCount = 1;
-
-    if (wave >= 12 && random() < 0.3) groupCount = 2;
-
-    for (let g = 0; g < groupCount; g++) {
-        let count = 1;
-
-        // --- 出現ロジック ---
-        if (wave >= 15 && random() < 0.15) {
-            type = random(["LANTERN_RED", "LANTERN_PURPLE", "LANTERN_YELLOW"]);
-            count = 1;
-        }
-        else if (wave >= 12 && random() < 0.20) {
-            type = "KAMIKAZE";
-            count = 3;
-        }
-        else if (wave >= 10 && random() < 0.2) { type = "SNIPER"; count = 1; }
-        else if (wave >= 6 && random() < 0.2) { type = "PHALANX_TRIO"; count = 1; }
-        else if (wave >= 10 && r > 0.7) {
-            let r3 = random();
-            if (r3 < 0.25) type = "PLAGUE"; else if (r3 < 0.5) type = "MEDUSA"; else if (r3 < 0.75) type = "CURSER"; else type = "HOOKER";
-        }
-        else if (wave >= 8 && r < 0.3) {
-            let r2 = random();
-            if (r2 < 0.25) type = "BARRIER"; else if (r2 < 0.5) type = "TWIN"; else if (r2 < 0.75) type = "BERSERKER"; else type = "HEAVY";
-            count = (type === "TWIN") ? 2 : 1;
+            this.life--; if(this.life<=0) this.dead=true;
         } else {
-            if (wave > 3 && r < 0.15) type = "FLANKER"; else if (wave > 5 && r > 0.85) type = "HEAVY"; else if (wave > 2 && r < 0.3) type = "SHOOTER"; else if (wave > 4 && r < 0.75) type = "TANK"; else if (wave > 1 && r < 0.5) type = "SWARM";
-            if (type === "SWARM") count = 3 + floor(wave / 3); else if (type === "FLANKER") count = 2; else count = 1;
-        }
-
-        let spawnRadius = width / 2 + 100;
-        let angleCenter = random(TWO_PI);
-
-        if (type === "PHALANX_TRIO") {
-            let bx = player.pos.x + cos(angleCenter) * spawnRadius;
-            let by = player.pos.y + sin(angleCenter) * spawnRadius;
-            let toPlayer = p5.Vector.sub(player.pos, createVector(bx, by)).normalize();
-            let perp = createVector(-toPlayer.y, toPlayer.x);
-            let e1 = new Enemy(bx, by, "P_TANK"); enemies.push(e1);
-            let e2 = new Enemy(bx + perp.x * 40 - toPlayer.x * 30, by + perp.y * 40 - toPlayer.y * 30, "P_FIGHTER"); enemies.push(e2);
-            let e3 = new Enemy(bx - perp.x * 40 - toPlayer.x * 60, by - perp.y * 40 - toPlayer.y * 60, "P_MAGE"); enemies.push(e3);
-            particles.push(new Shockwave(bx, by, 50, "#aaa"));
-        }
-        else {
-            for (let i = 0; i < count; i++) {
-                let angle = angleCenter + random(-0.5, 0.5);
-                let sx = constrain(player.pos.x + cos(angle) * spawnRadius, 50, WORLD_W - 50);
-                let sy = constrain(player.pos.y + sin(angle) * spawnRadius, 50, WORLD_H - 50);
-                enemies.push(new Enemy(sx, sy, type));
-                particles.push(new Shockwave(sx, sy, 30, "#fff"));
-                if (type === "BARRIER") { enemies.push(new Enemy(sx + 30, sy, "GUARD")); enemies.push(new Enemy(sx - 30, sy, "GUARD")); }
+            this.pos.add(this.vel); 
+            this.vel.mult(this.drag); 
+            
+            if (this.homing && this.target && !this.target.dead) {
+                let desired = p5.Vector.sub(this.target.pos, this.pos).setMag(this.vel.mag());
+                this.vel.lerp(desired, 0.1);
             }
-        }
-        r = random();
-    }
-}
 
-function updateProjectiles(list, targets, isPlayerOwner) {
-    for (let i = list.length - 1; i >= 0; i--) {
-        let p = list[i];
-        p.update();
+            if (this.card.id === "gear" || this.card.id === "super_ball") {
+                let left = camX;
+                let right = camX + width;
+                let top = camY;
+                let bottom = camY + height; 
 
-        if (frameCount % 2 === 0) {
-            if (p.card.id === "flame" || p.card.id === "flamethrower") particles.push(new AfterImage(p.pos.x + random(-3, 3), p.pos.y + random(-3, 3), random(5, 10), p.color, 10));
-            else if (!p.isOrbiter) particles.push(new Spark(p.pos.x, p.pos.y, p.color, p.vel.heading() + PI, random(1, 3), 5));
-        }
+                let bounced = false;
+                if (this.pos.x < left) { this.pos.x = left; this.vel.x *= -1; bounced = true; }
+                if (this.pos.x > right) { this.pos.x = right; this.vel.x *= -1; bounced = true; }
+                if (this.pos.y < top) { this.pos.y = top; this.vel.y *= -1; bounced = true; }
+                if (this.pos.y > bottom) { this.pos.y = bottom; this.vel.y *= -1; bounced = true; }
 
-        if (!p.dead) {
-            if (!isPlayerOwner && player.state === "MOVING" && player.activeMoveCard && player.activeMoveCard.id === "move_reflect") {
-                if (dist(p.pos.x, p.pos.y, player.pos.x, player.pos.y) < 40) {
-                    particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCK", "#aaf"));
-                    particles.push(new Shockwave(p.pos.x, p.pos.y, 20, "#aaf"));
-                    createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#aaf", 5);
-                    continue;
+                if (bounced) {
+                    this.bounceCount--;
+                    particles.push(new Spark(this.pos.x, this.pos.y, "#aaa", 0, 0, 10));
+                    if (this.bounceCount < 0) this.dead = true;
                 }
             }
 
-            for (let t of targets) {
-                if (t.dead) continue;
-                let hitSize = (t instanceof Deployable) ? 20 : t.size / 2 + 8;
-                if (p.card.id === "giga_laser") hitSize += 25;
-                if (p.card.id === "slow_sphere") hitSize += 30;
-
-                if (dist(p.pos.x, p.pos.y, t.pos.x, t.pos.y) < hitSize) {
-                    if (p.card.tag === "EXPLOSION") {
-                        createExplosion(p.pos.x, p.pos.y, p.val, p.card.range, isPlayerOwner);
-                        p.dead = true;
-                        break;
-                    }
-
-                    if (p.card.id === "cluster") {
-                        createExplosion(p.pos.x, p.pos.y, p.val, 60, isPlayerOwner, "#fa0");
-                        for (let m = 0; m < 3; m++) {
-                            let mbDir = p5.Vector.random2D();
-                            let mb = new Projectile(p.pos.x, p.pos.y, mbDir, { id: "minibomb", tag: "EXPLOSION", range: 60, color: "#fa0" }, p.val * 0.8, random(3, 6));
-                            mb.drag = 0.85;
-                            mb.life = 40 + random(20);
-                            list.push(mb);
-                        }
-                        p.dead = true;
-                        break;
-                    }
-
-                    if (isPlayerOwner) {
-                        // --- 指名手配（WANTED）シナジー ---
-                        if (p.card.id === "wanted_poster") {
-                            for (let other of enemies) other.isWanted = false;
-                            t.isWanted = true;
-                            particles.push(new TextParticle(t.pos.x, t.pos.y - 60, "WANTED!", "#f00", 60));
-                        }
-
-                        let dmg = p.val;
-                        if (t.isWanted) {
-                            if (p.card.id === "revolver") {
-                                dmg = Math.floor(dmg * 2);
-                                particles.push(new TextParticle(t.pos.x, t.pos.y, "CRIT!", "#ff0"));
-                            }
-                            else if (p.card.id === "deputy_shotgun") {
-                                dmg = Math.floor(dmg * 1.5);
-                                particles.push(new TextParticle(t.pos.x, t.pos.y, "SHOT!", "#fa0"));
-                            }
-                            else if (p.card.id === "execution") {
-                                dmg = Math.floor(dmg * 2);
-                                addShake(10);
-                                particles.push(new TextParticle(t.pos.x, t.pos.y, "EXECUTE", "#f00", 50));
-                            }
-                        }
-
-                        if (p.card.id === "lasso") {
-                            let pull = p5.Vector.sub(player.pos, t.pos).setMag(150);
-                            t.pos.add(pull);
-                            particles.push(new TextParticle(t.pos.x, t.pos.y, "PULL!", "#fff"));
-                        }
-
-                        if (p.card.id === "blood_spiller") {
-                            t.applyDebuff("BLEED", 0, 180);
-                        }
-
-                        t.takeDamage(dmg, p.card);
-
-                        if (t.eliteTrait === "VOID") {
-                            p.dead = true;
-                            particles.push(new TextParticle(p.pos.x, p.pos.y, "VOID", "#f0f"));
-                            break;
-                        }
-
-                        if (t.type === "GUARD") {
-                            p.dead = true;
-                            createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, "#fff", 5);
-                            particles.push(new TextParticle(p.pos.x, p.pos.y, "BLOCKED", "#fff"));
-                            break;
-                        }
-
-                        if (p.card.id === "shooting_star" && p.bounceCount > 0) {
-                            p.bounceCount--;
-                            let nextTarget = null;
-                            let minD = 9999;
-                            for (let cand of targets) {
-                                if (cand !== t && !cand.dead) {
-                                    let d = dist(p.pos.x, p.pos.y, cand.pos.x, cand.pos.y);
-                                    if (d < minD && d < 400) { minD = d; nextTarget = cand; }
-                                }
-                            }
-                            if (nextTarget) {
-                                let bounceDir = p5.Vector.sub(nextTarget.pos, p.pos).normalize();
-                                let newP = new Projectile(p.pos.x, p.pos.y, bounceDir, p.card, p.val * 0.9, 5);
-                                newP.bounceCount = p.bounceCount;
-                                list.push(newP);
-                            }
-                            p.dead = true;
-                            break;
-                        }
-                    }
-                    else {
-                        let dmg = p.val;
-                        for (let e of equipment) if (e.id === "e_kevlar") dmg *= 0.7;
-                        t.takeDamage(dmg, { pos: p.pos });
-
-                        if (p.card.tag === "PETRIFY") t.applyStatus("STUN", 60);
-                        if (p.card.tag === "SLOW") t.applyStatus("SLOW", 120);
-                        if (p.card.tag === "POISON" || p.card.id === "poison_flask" || p.card.id === "toxic_mist") t.applyStatus("POISON", 300);
-                        if (p.card.tag === "HOOK") {
-                            let pullDir = p.vel.copy().normalize().mult(-1);
-                            t.pos.add(pullDir.mult(150));
-                            particles.push(new TextParticle(t.pos.x, t.pos.y, "HOOKED!", "#f00"));
-                            addShake(10);
-                        }
-                    }
-
-                    createImpactSparks(p.pos.x, p.pos.y, p.vel.heading() + PI, p.color, 12);
-                    particles.push(new Shockwave(p.pos.x, p.pos.y, 30, p.color));
-
-                    if (!p.piercing && !p.isOrbiter) p.dead = true;
-                    break;
-                }
-            }
-        }
-        if (p.dead && p.drag) {
-            if (p.card.id === "minibomb") createExplosion(p.pos.x, p.pos.y, p.val, p.card.range, true, "#fa0");
-        }
-        if (p.dead) list.splice(i, 1);
-    }
-}
-
-function distSq(v, w) { return (v.x - w.x) * (v.x - w.x) + (v.y - w.y) * (v.y - w.y); }
-function createExplosion(x, y, dmg, range, isPlayerOwner, colOverride) {
-    let col = colOverride || "#f50";
-    addShake(8);
-    if (range > 100) triggerFlash(20);
-    particles.push(new Shockwave(x, y, range, col));
-    particles.push(new ExplosionEffect(x, y, col, 20));
-    particles.push(new AfterImage(x, y, range * 0.8, "#fff", 5));
-
-    if (dmg > 0) {
-        let targets = isPlayerOwner ? enemies : [player];
-        for (let t of targets) {
-            if (dist(x, y, t.pos.x, t.pos.y) < range) {
-                t.takeDamage(dmg, { tag: "EXPLOSION" });
-
-                if (t instanceof Enemy && t.eliteTrait === "IRON") {
-                } else {
-                    let push = p5.Vector.sub(t.pos, createVector(x, y)).setMag(20);
-                    t.pos.add(push);
-                }
-            }
+            this.life--; 
+            if(this.life<0 || this.pos.x<0 || this.pos.x>WORLD_W || this.pos.y<0 || this.pos.y>WORLD_H) this.dead=true; 
         }
     }
-}
-function createImpactSparks(x, y, angle, col, count) {
-    for (let i = 0; i < count; i++) {
-        let spd = random(4, 10);
-        let spread = random(-1.0, 1.0);
-        particles.push(new Spark(x, y, col, angle + spread, spd, random(15, 25)));
-    }
-}
-
-function keyPressed() {
-    if (gameState === "TITLE") {
-        if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "SELECT_CLASS";
-    }
-    else if (gameState === "SELECT_CLASS") {
-        if (keyCode === LEFT_ARROW) classIndex = (classIndex - 1 + 4) % 4;
-        if (keyCode === RIGHT_ARROW) classIndex = (classIndex + 1) % 4;
-        if (key === 'Enter' || key === 'z' || key === 'Z') { playerClass = CLASSES[classIndex]; startGame(); }
-    }
-    else if (gameState === "PLAY") {
-        if (key === 'Escape') {
-            isPaused = !isPaused;
+    draw() { 
+        push(); 
+        drawingContext.shadowBlur = 20; 
+        drawingContext.shadowColor = this.color;
+        fill(this.color); noStroke(); 
+        translate(this.pos.x, this.pos.y);
+        
+        if(this.card.id === "beam" || this.card.id === "sniper" || this.card.id === "intercept") {
+            rotate(this.vel.heading()); 
+            rect(-15, -3, 30, 6); 
+            fill(255); rect(-10,-1, 20,2); 
         }
-    }
-    else if (gameState === "LEVEL_UP" || gameState === "EQUIP_SELECT") {
-        if (keyCode === LEFT_ARROW) rewardIndex = (rewardIndex - 1 + CARD_CHOICES) % CARD_CHOICES;
-        if (keyCode === RIGHT_ARROW) rewardIndex = (rewardIndex + 1) % CARD_CHOICES;
-        if (key === 'Enter' || key === 'z' || key === 'Z') confirmSelection();
-        if (key === 'x' || key === 'X') {
-            gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
-            particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "SKIPPED", "#999"));
+        else if(this.card.id === "fan_laser") {
+             rotate(this.vel.heading());
+             rect(-15,-2, 30, 4);
         }
-    }
-    else if (gameState === "SKILL_TREE") {
-        if (keyCode === LEFT_ARROW) skillIndex = (skillIndex - 1 + 6) % 6;
-        if (keyCode === RIGHT_ARROW) skillIndex = (skillIndex + 1) % 6;
-        if (keyCode === UP_ARROW) skillIndex = (skillIndex - 3 + 6) % 6;
-        if (keyCode === DOWN_ARROW) skillIndex = (skillIndex + 3) % 6;
-
-        if (key === 'z' || key === 'Z') {
-            if (player.sp > 0) {
-                player.sp--;
-                if (skillIndex === 0) player.upgrades.hp++;
-                if (skillIndex === 1) player.upgrades.atk++;
-                if (skillIndex === 2) player.upgrades.spd++;
-                if (skillIndex === 3) player.upgrades.range++;
-                if (skillIndex === 4) player.upgrades.luck++;
-                // 変更: DEFENSE -> POTION
-                if (skillIndex === 5) player.upgrades.potion++;
-
-                player.maxHp = 200 + player.upgrades.hp * 25 + player.getStat("hpAdd"); // 変更: 増加量25
-                player.hp = min(player.hp + 50, player.maxHp);
-                particles.push(new TextParticle(width / 2, height / 2, "UPGRADE!", "#ff0"));
-                createImpactSparks(width / 2, height / 2, -HALF_PI, "#ff0", 20);
-            }
-            gameState = "PLAY";
+        else if(this.card.id === "giga_laser") { 
+            rotate(this.vel.heading()); 
+            fill(this.color); rect(-30, -15, 60, 30); 
+            fill(255); rect(-25, -8, 50, 16); 
         }
-    }
-    else if (gameState.includes("DISCARD")) {
-        let targetList = (gameState === "DISCARD_ACTION") ? deck : equipment;
-        if (keyCode === LEFT_ARROW) discardIndex = (discardIndex - 1 + targetList.length) % targetList.length;
-        if (keyCode === RIGHT_ARROW) discardIndex = (discardIndex + 1) % targetList.length;
-        if (key === 'Enter' || key === 'z' || key === 'Z') confirmDiscard();
-    }
-    else if (gameState === "GAME_OVER") { if (key === 'Enter' || key === 'z' || key === 'Z') gameState = "TITLE"; }
-    else if (gameState === "LIBRARY") { if (key === 'x' || key === 'X' || key === 'Escape') gameState = "TITLE"; }
-}
-
-function startGame() {
-    if (playerClass === "WARRIOR") deck = [getCardById("slash"), getCardById("hammer"), getCardById("charge")];
-    else if (playerClass === "RANGER") deck = [getCardById("bow"), getCardById("boomerang"), getCardById("shotgun")];
-    else if (playerClass === "MAGE") deck = [getCardById("flame"), getCardById("cleave"), getCardById("beam")];
-    else deck = [getCardById("slash"), getCardById("bow"), getCardById("heal")];
-
-    equipment = [];
-    player = new Player();
-    enemies = []; drops = []; projectiles = []; enemyProjectiles = []; particles = []; deployables = []; puddles = [];
-    score = 0; wave = 1; enemiesToNextLevel = 5;
-    totalKills = 0;
-    spProgress = 0;
-    killsForNextSp = 10;
-    isPaused = false;
-
-    player.pos = createVector(WORLD_W / 2, WORLD_H / 2);
-    camX = WORLD_W / 2 - width / 2;
-    camY = WORLD_H / 2 - height / 2;
-    player.refreshMoveCard();
-    gameState = "PLAY";
-}
-
-function generateRewards(type) {
-    rewardOptions = [];
-    let pool;
-    if (type === "ACTION") {
-        pool = actionLibrary.filter(c => c.type === "ACTION");
-    } else {
-        pool = [...equipLibrary, ...actionLibrary.filter(c => c.type === "MOVE")];
-        pool = pool.filter(c => !equipment.some(e => e.id === c.id));
-    }
-
-    if (pool.length === 0) pool = (type === "ACTION") ? actionLibrary : equipLibrary;
-
-    let availablePool = pool;
-
-    for (let i = 0; i < CARD_CHOICES; i++) {
-        let rarityRoll = random();
-        let targetRarity = "COMMON";
-        if (rarityRoll < 0.10) targetRarity = "LEGENDARY";
-        else if (rarityRoll < 0.40) targetRarity = "RARE";
-
-        let rarityPool = availablePool.filter(c => c.rarity === targetRarity);
-        if (rarityPool.length === 0) rarityPool = availablePool;
-
-        let weightedPool = [];
-        for (let c of rarityPool) {
-            let weight = 1;
-            if (playerClass === "WARRIOR" && c.system === "Melee") weight = 3;
-            if (playerClass === "RANGER" && c.system === "Ranged") weight = 3;
-            if (playerClass === "MAGE" && c.system === "Magic") weight = 3;
-            if (deck.some(d => d.id === c.id)) weight += 2;
-            for (let k = 0; k < weight; k++) weightedPool.push(c);
+        else if(this.card.id === "railgun") {
+            rotate(this.vel.heading());
+            fill(100, 200, 255); rect(-40, -4, 1200, 8); 
+            fill(255); rect(-30, -2, 1200, 4);
         }
-
-        if (weightedPool.length === 0) weightedPool = availablePool;
-
-        let r = floor(random(weightedPool.length));
-        let c = { ...weightedPool[r] };
-        if (c.cooldownMax) c.currentCooldown = 0;
-
-        if (rewardOptions.some(opt => opt.id === c.id)) {
-            if (availablePool.length > CARD_CHOICES) { i--; continue; }
+        else if(this.card.id === "slow_sphere") {
+             circle(0,0,30); 
         }
-        rewardOptions.push(c);
-    }
-}
-
-function confirmSelection() {
-    let selection = rewardOptions[rewardIndex];
-    let nextState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
-
-    if (selection.category === "ACTION") {
-        let existingCard = deck.find(c => c.id === selection.id);
-        if (existingCard) {
-            if ((existingCard.level || 1) < 5) {
-                existingCard.level = (existingCard.level || 1) + 1;
-                particles.push(new TextParticle(player.pos.x, player.pos.y - 40, "LEVEL UP!", "#fff"));
-                createImpactSparks(player.pos.x, player.pos.y, -HALF_PI, selection.color, 15);
-                gameState = nextState;
-                return;
-            }
+        else if(this.card.id === "icicle") {
+             rotate(this.vel.heading());
+             fill(200, 255, 255);
+             triangle(10, 0, -10, 4, -10, -4);
         }
+        else if(this.card.id === "javelin") {
+            rotate(this.vel.heading());
+            stroke(255, 100); strokeWeight(1); line(-40, 0, 0, 0); noStroke();
+            fill(139, 69, 19); rect(-15, -2, 30, 4);
+            fill(200, 200, 200); triangle(15, -4, 35, 0, 15, 4);
+            fill(255); rect(-10, -1, 20, 2);
+        }
+        else if (this.card.id === "gear") {
+            rotate(frameCount * 0.2);
+            fill(150); circle(0, 0, 20);
+            fill(200); for(let i=0; i<8; i++) { rotate(PI/4); rect(8, -3, 6, 6); }
+            fill(50); circle(0,0,8);
+        }
+        else if (this.card.id === "super_ball") {
+            fill(random(255), random(255), 255); 
+            circle(0, 0, 18);
+            fill(255, 200); circle(4, -4, 6);
+        }
+        else if (this.card.id === "homing_missile" || this.card.id === "tracking_rounds") {
+            rotate(this.vel.heading());
+            fill(200, 100, 50); rect(-10, -4, 20, 8);
+            fill(255, 0, 0); triangle(10, -4, 15, 0, 10, 4);
+            fill(255, 200, 0, 150); triangle(-10, -3, -10, 3, -10 - random(5,10), 0);
+        }
+        else if (this.card.id === "poison_flask") {
+            rotate(this.vel.heading());
+            fill(0, 255, 0); rect(-6, -4, 12, 8, 2);
+            fill(200); rect(4, -2, 4, 4); 
+        }
+        else if (this.card.id === "toxic_mist") {
+            // 乱射される魔法弾
+            fill(150, 0, 200); circle(0,0,12);
+            fill(0, 255, 100, 150); circle(0,0,8);
+        }
+        else if (this.card.id === "blood_spiller") {
+            // 回転する血の刃
+            rotate(frameCount * 0.4);
+            fill(200, 0, 0); noStroke();
+            beginShape();
+            vertex(0, -5); vertex(20, 0); vertex(0, 5); vertex(-5, 0);
+            endShape(CLOSE);
+        }
+        else if (this.card.id === "throwing_knife") {
+            rotate(frameCount * 0.5);
+            fill(200); noStroke();
+            rect(-2, -8, 4, 16); 
+            fill(100, 50, 0); rect(-2, 8, 4, 6); 
+        }
+        else if(this.isBoomerang) { 
+            rotate(frameCount * 0.5); 
+            noFill(); stroke(this.color); strokeWeight(4); arc(0,0,24,24, 0, PI/1.5); 
+        }
+        else if(this.card.id === "flame" || this.card.id === "flamethrower") {
+            fill(255,100,0); circle(0,0,random(8,14));
+        }
+        else if(this.card.id === "bow" || this.card.id === "backstep") {
+            rotate(this.vel.heading());
+            fill(255); triangle(5,0, -5,-4, -5,4);
+        }
+        else if(this.card.id === "shooting_star") {
+            rotate(this.vel.heading());
+            fill(255, 255, 100);
+            beginShape(); vertex(10,0); vertex(-5,5); vertex(-5,-5); endShape(CLOSE);
+        }
+        else if(this.card.id === "desert_eagle" || this.card.id === "revolver") {
+             fill(this.color);
+             rect(-4, -2, 8, 4);
+        }
+        else if(this.card.tag === "EXPLOSION") circle(0, 0, 14);
+        else circle(0, 0, 10); 
+        
+        pop(); 
     }
-
-    if (selection.type === "MOVE") {
-        let idx = deck.findIndex(c => c.type === "MOVE");
-        if (idx !== -1) deck.splice(idx, 1);
-        deck.push(selection);
-        player.refreshMoveCard();
-        gameState = nextState;
-        return;
-    }
-    let targetList = (selection.category === "EQUIP") ? equipment : deck;
-    let maxSize = (selection.category === "EQUIP") ? MAX_EQUIP_SIZE : MAX_DECK_SIZE;
-    if (targetList.length >= maxSize) {
-        pendingCard = selection; discardIndex = 0;
-        gameState = (selection.category === "EQUIP") ? "DISCARD_EQUIP" : "DISCARD_ACTION";
-    } else {
-        targetList.push(selection);
-        gameState = nextState;
-    }
-}
-
-function confirmDiscard() {
-    if (gameState === "DISCARD_ACTION") { deck.splice(discardIndex, 1); deck.push(pendingCard); player.refreshMoveCard(); }
-    else if (gameState === "DISCARD_EQUIP") { equipment.splice(discardIndex, 1); equipment.push(pendingCard); }
-    pendingCard = null;
-    gameState = (player.sp > 0) ? "SKILL_TREE" : "PLAY";
 }
