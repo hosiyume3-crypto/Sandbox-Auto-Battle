@@ -36,6 +36,9 @@ class Enemy {
         this.noiseOffset = random(1000);
         this.eliteTrait = null;
 
+        // ノックバック倍率 (デフォルト1.0)
+        this.kbMult = 1.0;
+
         const scaleFactor = Math.floor((wave - 1) / 5);
         let hpBonus = scaleFactor * 20;
         let dmgBonus = scaleFactor * 5;
@@ -79,8 +82,13 @@ class Enemy {
         else if (type === "LANTERN_RED") { baseHp = 40; baseDmg = 12; speed = 2.0; size = 18; col = color(200, 50, 50); }
         else if (type === "LANTERN_PURPLE") { baseHp = 60; baseDmg = 15; speed = 1.8; size = 20; col = color(150, 50, 200); }
         else if (type === "LANTERN_YELLOW") { baseHp = 80; baseDmg = 10; speed = 2.2; size = 18; col = color(200, 200, 50); }
-        else if (type === "KAMIKAZE") { baseHp = 30; baseDmg = 60; speed = 4.5; size = 20; col = color(255, 100, 0); }
-        else if (type === "MEDUSA") { baseHp = 400; baseDmg = 20; speed = 1.0; size = 35; col = color(50, 150, 100); }
+        // 変更: KAMIKAZE 速度半減 (4.5 -> 2.25)、ノックバック倍率設定
+        else if (type === "KAMIKAZE") { 
+            baseHp = 30; baseDmg = 60; speed = 2.25; size = 20; col = color(255, 100, 0); 
+            this.kbMult = 1.5; // ノックバックを受けやすくする
+        }
+        // 削除: MEDUSA
+        // else if (type === "MEDUSA") { ... }
 
         this.hp = baseHp + wave * 5 + hpBonus;
         this.dmg = baseDmg + dmgBonus;
@@ -236,10 +244,11 @@ class Enemy {
             }
         }
 
-        if (this.type === "SHOOTER" || this.type === "WIZARD" || this.type === "CURSER" || this.type === "HOOKER" || this.type === "P_MAGE" || this.type === "C_GUNNER" || this.type === "MEDUSA") {
+        // 変更: MEDUSA 削除
+        if (this.type === "SHOOTER" || this.type === "WIZARD" || this.type === "CURSER" || this.type === "HOOKER" || this.type === "P_MAGE" || this.type === "C_GUNNER") {
             let keepDist = 250;
             if (this.type === "WIZARD") keepDist = 300;
-            if (this.type === "MEDUSA") keepDist = 200;
+            // if (this.type === "MEDUSA") keepDist = 200; // 削除
             if (d > keepDist) dir.setMag(spd); else if (d < keepDist - 100) dir.setMag(-spd * 0.5); else dir.mult(0);
             this.pos.add(dir); this.shootTimer--;
             if (this.shootTimer <= 0 && this.frozenTimer <= 0) { this.shoot(); this.shootTimer = 120; }
@@ -336,9 +345,12 @@ class Enemy {
         else if (this.type === "MERCHANT") {
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), { id: "throwing_knife", val: this.dmg, color: "#fff" }, this.dmg, 12));
         }
+        // 変更: MEDUSA 削除
+        /*
         else if (this.type === "MEDUSA") {
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), { val: this.dmg, tag: "PETRIFY", color: "#888" }, this.dmg, 6));
         }
+        */
         else {
             enemyProjectiles.push(new Projectile(this.pos.x, this.pos.y, p5.Vector.sub(player.pos, this.pos).normalize(), { val: this.dmg }, this.dmg, 4));
         }
@@ -455,7 +467,10 @@ class Enemy {
         else if (this.type === "MERCHANT") { fill(this.col); arc(0, 0, 30, 40, PI, TWO_PI); rect(-15, 0, 30, 20); fill(180, 100, 50); ellipse(10, 5, 12, 16); fill(0); ellipse(0, -5, 10, 10); fill(255, 255, 0); circle(-2, -5, 2); circle(2, -5, 2); }
         else if (this.type.startsWith("LANTERN")) { noStroke(); fill(this.col); ellipse(0, 0, this.size, this.size * 1.2); fill(255, 255, 200, 200); circle(0, 0, this.size * 0.6); }
         else if (this.type === "KAMIKAZE") { fill(frameCount % 10 < 5 ? "#f50" : "#500"); triangle(0, -this.size, -this.size / 2, this.size / 2, this.size / 2, this.size / 2); }
+        // 変更: MEDUSA 削除
+        /*
         else if (this.type === "MEDUSA") { fill(this.col); rect(-15, -20, 30, 40, 5); fill(50, 200, 50); for (let i = 0; i < 5; i++) { let angle = map(i, 0, 4, -PI / 2, PI / 2); let hx = cos(angle - PI / 2) * 15; let hy = sin(angle - PI / 2) * 15 - 20; circle(hx, hy, 8); } }
+        */
         else { ellipse(0, 0, this.size, this.size); }
 
         drawingContext.shadowBlur = 0;
