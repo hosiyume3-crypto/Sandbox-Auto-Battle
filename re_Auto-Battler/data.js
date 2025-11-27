@@ -47,7 +47,7 @@ function initLibraries() {
         // --- 毒ビルド用カード ---
         A("poison_flask", "毒フラスコ", "Magic", "RANGE", "PROJECTILE", 300, 10, 40, 60, "COMMON", "着弾地点に毒をばら撒く。毒の敵には威力増。"),
         A("bane_bolt", "ベインボルト", "Magic", "MELEE", "ATK", 90, 10, 10, 60, "RARE", "高速の魔法斬撃。毒の敵を切り刻む。"),
-        A("toxic_mist", "トキシックミスト", "Magic", "RANGE", "PROJECTILE", 400, 6, 40, 180, "COMMON", "毒を付与する魔法弾を乱れ撃つ。"),
+        A("toxic_mist", "トキシックミスト", "Magic", "RANGE", "PROJECTILE", 400, 12, 40, 180, "COMMON", "毒を付与する魔法弾を乱れ撃つ。"),
         A("venom_whip", "ベノムウィップ", "Magic", "AOE", "ATK", 150, 20, 20, 120, "RARE", "前方を一掃。毒の敵に威力3倍。"),
         A("pandemic", "パンデミック", "Magic", "AOE", "ATK", 300, 50, 60, 480, "LEGENDARY", "広範囲攻撃。毒の敵には2倍ダメージ。"),
 
@@ -64,7 +64,7 @@ function initLibraries() {
         A("counter", "カウンター", "Melee", "SELF", "BUFF", 0, 50, 120, 360, "RARE", "構え中被弾無効＆背後反撃。"),
         A("boomerang", "ブーメラン", "Ranged", "RANGE", "PROJECTILE", 250, 20, 30, 180, "RARE", "手元に戻ってくる貫通武器。"),
         A("air_raid", "空爆支援", "Ranged", "AOE", "ATK", 999, 56, 60, 900, "LEGENDARY", "ランダムな敵の頭上を爆撃。"), 
-        A("life_drain", "ドレイン", "Magic", "RANGE", "DEBUFF", 100, 0, 20, 600, "RARE", "対象の体力を吸収する。"),
+        // 削除: life_drain
         A("gatotsu", "牙突", "Melee", "MELEE", "ATK", 150, 14, 20, 300, "RARE", "最も遠い敵へ高速突進。"),
         A("shadow_bind", "影縛り", "Ranged", "AOE", "DEBUFF", 250, 0, 20, 600, "RARE", "範囲内の敵をスタンさせる。"),
         A("slow_sphere", "重力球", "Magic", "RANGE", "PROJECTILE", 999, 28, 60, 180, "RARE", "ゆっくり進む巨大な貫通弾。"),
